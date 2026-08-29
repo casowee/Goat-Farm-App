@@ -214,9 +214,12 @@ production build (`next start`) via a temporary env-gated auth bypass (`WIZARD_V
 
 **Owner acceptance (2026-08-28):** the owner tested the wizard directly in the running app, including at
 phone width, and confirmed it works — this covers the authenticated Save path that agent testing could
-not reach. Cross-account RLS on a second real login remains the only outstanding check, unchanged from
-every prior goat session; the server action and schema are untouched by this update, so the single-write
-create/update path is the same one already exercised by `05` / `05a` / `06`.
+not reach. The server action and schema are untouched by this update, so the single-write create/update
+path is the same one already exercised by `05` / `05a` / `06`.
+
+**Cross-account RLS — ✅ confirmed 2026-08-29 (manual, owner-performed).** The owner created a second
+test user, logged in as them, and confirmed a completely empty farm. Nothing outstanding for this
+update.
 
 ## 13. Resolution / final state
 

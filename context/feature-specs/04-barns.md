@@ -65,7 +65,7 @@ Build barns end to end and, in doing so, establish the CRUD template for the res
 - Signed in, `/barns` lists the owner's barns and shows the empty state when there are none.
 - Adding a barn (name required) makes it appear in the list; category and notes are optional.
 - Editing a barn updates it; deleting removes it after a confirmation.
-- If a second account is tested, it never sees the first account's barns — RLS holds.
+- If a second account is tested, it never sees the first account's barns — RLS holds. **✅ Confirmed 2026-08-29** — the owner logged in as a second test user and saw a completely empty farm (manual owner-performed check, not automated).
 - The Barns nav item works and the page renders dark-desert with no light-mode flash.
 
 ## Manual steps for the owner

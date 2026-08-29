@@ -43,21 +43,36 @@ Every owned table has an `owner` column referencing the Supabase auth user, used
 - `barns` — name, category (does / bucks / kids / mixed / other), notes.
 - `goats` — name / tag, breed, sex, date of birth, reproductive state (intact / castrated), status (active / sold / deceased), `barn_id` (the goat's current barn — nullable in the database, but always set by the registration screen), photo URL, notes, `sire_id` and `dam_id` (self-referencing links to other goats, nullable), and `sire_name` / `dam_name` for external parents not in the system.
 - `goat_barn_moves` — goat, from barn, to barn, and date (optional history of a goat's moves between barns).
-- `health_events` — goat, date, illness / symptoms, treatment, outcome, notes.
-- `vaccinations` — goat, vaccine, date given, next due date.
-- `dewormings` — goat, product, date, next due date.
-- `medicine_records` — goat, medicine, dose, date administered.
-- `breedings` — sire, dam, mating date, expected kidding date, actual kidding date, offspring.
-- `weights` — goat, date, weight.
-- `inventory_items` — type (medicine / feed), name, quantity, unit, low-stock threshold.
+- `health_records` — **one table for every health event** (spec 07, migration `20260829000001_health_records.sql`).
+  `record_type` enum (`vaccination` / `illness` / `treatment` / `deworming` / `checkup` / `injury` / `surgery`),
+  `status` enum (`active` / `completed` / `cancelled`), `title`, `date_occurred`, `next_due_date` (recurring-care
+  follow-up date — vaccination / deworming / checkup), medication-course fields (`medication_name`, `dosage`,
+  `treatment_start_date`, `treatment_duration_days`, `treatment_times_per_day`), `vet_name`, `cost`, `goat_id` →
+  `goats` (`on delete cascade`), `owner_id`. This **replaces** the original sketch's separate `health_events` /
+  `vaccinations` / `dewormings` / `medicine_records` tables — those were never built under the spec workflow.
+  *(The similarly-named `vaccinations` / `deworming` / `medicine_records` / `health_history` tables that exist in
+  the database are untouched legacy prototype tables keyed on `goat_records.tag_number`, unrelated to `health_records`.)*
+- `health_condition_presets` — `UPD-004`: seeded farm-wide + owner-custom title suggestions per `record_type`.
+- `breedings` — sire, dam, mating date, expected kidding date, actual kidding date, offspring. *(Spec 09 — not built yet.)*
+- `weights` — goat, date (`weighed_on`), weight (`weight_kg`), notes (spec 08, migration `20260829000002_weights.sql`).
+- `inventory_items` — type (medicine / feed), name, quantity, unit, low-stock threshold, `category` (medicine only). *(`UPD-005` + spec 10.)*
+- `herd_events` — `event_type` enum (`sale` / `death` / `other_addition` / `other_removal` — **not** birth/purchase,
+  which stay derived from goat records), optional `goat_id`, `event_date`, `note`. Feeds the dashboard's
+  herd-population timeline. Written via the `log_herd_event(...)` RPC, which also flips a linked goat's
+  `status` to `sold` / `deceased` for a Sale / Death in the same call. *(`UPD-006`,
+  migration `20260829000006_herd_events.sql`.)* Spec 11 (sales & purchases) should integrate with this,
+  not duplicate it.
 - `sales_purchases` — type (sale / purchase), optional goat, party, date, amount, notes.
 - `tasks` — title, due date, done flag, type (task / feeding / health check), optional goat.
 
 Derived, not stored as tables:
 
-- **Calendar events** are read from the due-date columns (`vaccinations.next_due`, `dewormings.next_due`, `breedings.expected_kidding`, `tasks.due_date`) and merged into one event list.
+- **Calendar events** are read from the due-date columns (`health_records.next_due_date` for recurring vaccination / deworming / checkup follow-ups, `breedings.expected_kidding`, `tasks.due_date`) and merged into one event list. Spec 12 introduced the first cut of this query as the pure `dueSoon()` function in `lib/dashboard/due-soon.ts`; spec 13 (calendar) reuses it.
 - **Reminders** use the same due-date queries.
 - **Family tree** is walked through `goats.sire_id` / `goats.dam_id`.
+- **Herd-population timeline** (`UPD-006`) combines derived birth/purchase additions (`goats.date_of_birth`
+  for `origin = 'born_here'`, `goats.purchase_date` for `origin = 'purchased'`) with manual `herd_events`
+  rows into one running total — the pure `computeHerdTimeline()` in `lib/dashboard/herd-timeline.ts`.
 - **Goat stage / class** (Doe, Doeling, Buck, Buckling, Wether, Kid) is computed from `sex`, age (from date of birth), and reproductive state — not stored.
 
 ## Auth and Ownership Model

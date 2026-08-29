@@ -17,6 +17,17 @@ import {
   BarnMoveHistory,
   type BarnMove,
 } from "@/components/goats/barn-move-history";
+import { HealthRecordFormDialog } from "@/components/health/health-record-form-dialog";
+import { HealthRecordList } from "@/components/health/health-record-list";
+import {
+  listHealthConditionPresets,
+  listHealthRecordsByGoat,
+} from "@/app/(app)/health/actions";
+import { listMedicineItems } from "@/app/(app)/inventory/actions";
+import { WeightFormDialog } from "@/components/weight/weight-form-dialog";
+import { WeightGrowthChart } from "@/components/weight/weight-growth-chart";
+import { WeightHistoryList } from "@/components/weight/weight-history-list";
+import { listWeightsByGoat } from "@/app/(app)/weight/actions";
 
 function formatAge(dateOfBirth: string): string {
   const months = ageInMonths(dateOfBirth);
@@ -90,6 +101,11 @@ export default async function GoatDetailPage({
     .eq("goat_id", goatId)
     .order("moved_on", { ascending: false })
     .order("id", { ascending: false });
+
+  const healthRecords = await listHealthRecordsByGoat(goatId);
+  const healthPresets = await listHealthConditionPresets();
+  const medicines = await listMedicineItems();
+  const weights = await listWeightsByGoat(goatId);
 
   const parentGoats = (allGoats ?? []).map((g) => ({
     id: g.id,
@@ -219,10 +235,51 @@ export default async function GoatDetailPage({
           <TabsTrigger value="lineage">Lineage</TabsTrigger>
         </TabsList>
         <TabsContent value="health">
-          <ComingSoon label="Health history" />
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+              <CardTitle className="text-sm text-copy-secondary">
+                Health records
+              </CardTitle>
+              <HealthRecordFormDialog
+                goatId={goat.id}
+                presets={healthPresets}
+                medicines={medicines}
+                triggerLabel="Add health record"
+                triggerIcon
+              />
+            </CardHeader>
+            <CardContent>
+              <HealthRecordList
+                goatId={goat.id}
+                records={healthRecords}
+                presets={healthPresets}
+                medicines={medicines}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
         <TabsContent value="weight">
-          <ComingSoon label="Weight history" />
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+              <CardTitle className="text-sm text-copy-secondary">Weight</CardTitle>
+              <WeightFormDialog
+                goatId={goat.id}
+                triggerLabel="Add weight"
+                triggerIcon
+              />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {weights.length > 0 ? (
+                <WeightGrowthChart
+                  points={weights.map((w) => ({
+                    weighed_on: w.weighed_on,
+                    weight_kg: w.weight_kg,
+                  }))}
+                />
+              ) : null}
+              <WeightHistoryList goatId={goat.id} weights={weights} />
+            </CardContent>
+          </Card>
         </TabsContent>
         <TabsContent value="breeding">
           <ComingSoon label="Breeding history" />

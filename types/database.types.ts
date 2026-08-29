@@ -413,6 +413,30 @@ export type Database = {
           },
         ]
       }
+      health_condition_presets: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          owner_id: string | null
+          record_type: Database["public"]["Enums"]["health_record_type"]
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          owner_id?: string | null
+          record_type: Database["public"]["Enums"]["health_record_type"]
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          owner_id?: string | null
+          record_type?: Database["public"]["Enums"]["health_record_type"]
+        }
+        Relationships: []
+      }
       health_history: {
         Row: {
           created_at: string | null
@@ -468,6 +492,151 @@ export type Database = {
             referencedColumns: ["tag_number"]
           },
         ]
+      }
+      health_records: {
+        Row: {
+          cost: number | null
+          created_at: string
+          date_occurred: string
+          dosage: string | null
+          goat_id: number
+          id: number
+          medication_name: string | null
+          next_due_date: string | null
+          notes: string | null
+          owner_id: string
+          record_type: Database["public"]["Enums"]["health_record_type"]
+          status: Database["public"]["Enums"]["health_record_status"]
+          title: string
+          treatment_duration_days: number | null
+          treatment_start_date: string | null
+          treatment_times_per_day: number | null
+          updated_at: string
+          vet_name: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          date_occurred?: string
+          dosage?: string | null
+          goat_id: number
+          id?: number
+          medication_name?: string | null
+          next_due_date?: string | null
+          notes?: string | null
+          owner_id?: string
+          record_type: Database["public"]["Enums"]["health_record_type"]
+          status?: Database["public"]["Enums"]["health_record_status"]
+          title: string
+          treatment_duration_days?: number | null
+          treatment_start_date?: string | null
+          treatment_times_per_day?: number | null
+          updated_at?: string
+          vet_name?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          date_occurred?: string
+          dosage?: string | null
+          goat_id?: number
+          id?: number
+          medication_name?: string | null
+          next_due_date?: string | null
+          notes?: string | null
+          owner_id?: string
+          record_type?: Database["public"]["Enums"]["health_record_type"]
+          status?: Database["public"]["Enums"]["health_record_status"]
+          title?: string
+          treatment_duration_days?: number | null
+          treatment_start_date?: string | null
+          treatment_times_per_day?: number | null
+          updated_at?: string
+          vet_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_records_goat_id_fkey"
+            columns: ["goat_id"]
+            isOneToOne: false
+            referencedRelation: "goats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      herd_events: {
+        Row: {
+          created_at: string
+          event_date: string
+          event_type: Database["public"]["Enums"]["herd_event_type"]
+          goat_id: number | null
+          id: number
+          note: string | null
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_date?: string
+          event_type: Database["public"]["Enums"]["herd_event_type"]
+          goat_id?: number | null
+          id?: number
+          note?: string | null
+          owner_id?: string
+        }
+        Update: {
+          created_at?: string
+          event_date?: string
+          event_type?: Database["public"]["Enums"]["herd_event_type"]
+          goat_id?: number | null
+          id?: number
+          note?: string | null
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "herd_events_goat_id_fkey"
+            columns: ["goat_id"]
+            isOneToOne: false
+            referencedRelation: "goats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_items: {
+        Row: {
+          category: Database["public"]["Enums"]["medicine_category"] | null
+          created_at: string
+          id: number
+          low_stock_threshold: number | null
+          name: string
+          owner_id: string
+          quantity: number
+          type: Database["public"]["Enums"]["inventory_item_type"]
+          unit: string | null
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["medicine_category"] | null
+          created_at?: string
+          id?: number
+          low_stock_threshold?: number | null
+          name: string
+          owner_id?: string
+          quantity?: number
+          type?: Database["public"]["Enums"]["inventory_item_type"]
+          unit?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["medicine_category"] | null
+          created_at?: string
+          id?: number
+          low_stock_threshold?: number | null
+          name?: string
+          owner_id?: string
+          quantity?: number
+          type?: Database["public"]["Enums"]["inventory_item_type"]
+          unit?: string | null
+        }
+        Relationships: []
       }
       medicine_records: {
         Row: {
@@ -654,17 +823,97 @@ export type Database = {
           },
         ]
       }
+      weights: {
+        Row: {
+          created_at: string
+          goat_id: number
+          id: number
+          notes: string | null
+          owner_id: string
+          updated_at: string
+          weighed_on: string
+          weight_kg: number
+        }
+        Insert: {
+          created_at?: string
+          goat_id: number
+          id?: number
+          notes?: string | null
+          owner_id?: string
+          updated_at?: string
+          weighed_on?: string
+          weight_kg: number
+        }
+        Update: {
+          created_at?: string
+          goat_id?: number
+          id?: number
+          notes?: string | null
+          owner_id?: string
+          updated_at?: string
+          weighed_on?: string
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weights_goat_id_fkey"
+            columns: ["goat_id"]
+            isOneToOne: false
+            referencedRelation: "goats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      log_herd_event: {
+        Args: {
+          p_event_date: string
+          p_event_type: Database["public"]["Enums"]["herd_event_type"]
+          p_goat_id?: number
+          p_note?: string
+        }
+        Returns: {
+          created_at: string
+          event_date: string
+          event_type: Database["public"]["Enums"]["herd_event_type"]
+          goat_id: number | null
+          id: number
+          note: string | null
+          owner_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "herd_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       goat_origin: "born_here" | "purchased"
       goat_sex: "male" | "female"
       goat_status: "active" | "sold" | "deceased"
+      health_record_status: "active" | "completed" | "cancelled"
+      health_record_type:
+        | "vaccination"
+        | "illness"
+        | "treatment"
+        | "deworming"
+        | "checkup"
+        | "injury"
+        | "surgery"
+      herd_event_type: "sale" | "death" | "other_addition" | "other_removal"
+      inventory_item_type: "medicine" | "feed"
+      medicine_category:
+        | "antibiotic"
+        | "vitamin_support"
+        | "anti_inflammatory"
+        | "dewormer"
+        | "other"
       reproductive_state: "intact" | "castrated"
     }
     CompositeTypes: {
@@ -796,6 +1045,25 @@ export const Constants = {
       goat_origin: ["born_here", "purchased"],
       goat_sex: ["male", "female"],
       goat_status: ["active", "sold", "deceased"],
+      health_record_status: ["active", "completed", "cancelled"],
+      health_record_type: [
+        "vaccination",
+        "illness",
+        "treatment",
+        "deworming",
+        "checkup",
+        "injury",
+        "surgery",
+      ],
+      herd_event_type: ["sale", "death", "other_addition", "other_removal"],
+      inventory_item_type: ["medicine", "feed"],
+      medicine_category: [
+        "antibiotic",
+        "vitamin_support",
+        "anti_inflammatory",
+        "dewormer",
+        "other",
+      ],
       reproductive_state: ["intact", "castrated"],
     },
   },

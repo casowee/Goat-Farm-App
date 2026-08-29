@@ -51,20 +51,32 @@ Small features stay a single row. Sub-feature tables below are filled in for fin
 | 1     | 05  | goat-profiles               | Both       | `done` **     |
 | 1     | 05a | goat-origin-and-breed       | Both       | `done`        |
 | 2     | 06  | family-tree                 | Both       | `done` ***    |
-| 2     | 07  | health-records              | Both       | `planned` ◀ next |
-| 2     | 08  | weight-records              | Both       | `planned`     |
-| 2     | 09  | breeding-and-inbreeding     | Both       | `planned`     |
-| 3     | 10  | inventory                   | Both       | `planned`     |
+| 2     | 07  | health-records              | Both       | `in progress` **** |
+| 2     | 08  | weight-records              | Both       | `in progress` ◀ — **paused** (built; awaiting owner's manual test — no further work until confirmed) |
+| 2     | 09  | breeding-and-inbreeding     | Both       | `planned` ◀ — **deferred at owner's request** (not started; resume only when the owner says so) |
+| 3     | 10  | inventory                   | Both       | `done` ***** — built **ahead of 08/09 at the owner's request** (out of normal roadmap order) and confirmed working by the owner in the running app (2026-08-29) |
 | 3     | 11  | sales-and-purchases         | Both       | `planned`     |
-| 4     | 12  | dashboard-analytics         | Both       | `planned`     |
+| 4     | 12  | dashboard-analytics         | Both       | `done` ****** — built **ahead of 09 and 11 at the owner's request** (out of roadmap order) and confirmed working by the owner in the running app (2026-08-29); Sales widget deferred to a "coming soon" placeholder until 11 exists |
 | 4     | 13  | calendar                    | Both       | `planned`     |
 | 5     | 14  | todos-reminders             | Both       | `planned`     |
 | 5     | 15  | health-reference (Doctor)   | Front-end  | `planned`     |
 | 5     | 16  | reports-pdf                 | Both       | `planned`     |
 
-`*` Barns code is complete and verified; the owner's own logged-in cross-account RLS test is still outstanding (needs their real credentials).
-`**` Goat profiles core (schema, stage logic, CRUD, list/filter, form, detail page) is complete and verified; photo upload was deferred to its own follow-up increment per the owner, and the owner's own logged-in cross-account RLS test is still outstanding, same as barns.
-`***` Family tree (parents/pedigree, multi-breed composition, parent-based breed computation, barn-move history) is complete, browser-verified, and **tested and confirmed working by the owner in the running app (2026-08-28)**; only the cross-account RLS check on the two new tables (needs a second real login) is still outstanding, same as barns/goats. Minor UX refinements to family-tree / breed composition may follow later.
+`*` Barns code is complete and verified. **Cross-account RLS: confirmed (2026-08-29)** — see the cross-cutting note below.
+`**` Goat profiles core (schema, stage logic, CRUD, list/filter, form, detail page) is complete and verified; photo upload was deferred to its own follow-up increment per the owner. **Cross-account RLS: confirmed (2026-08-29)** — see the cross-cutting note below.
+`***` Family tree (parents/pedigree, multi-breed composition, parent-based breed computation, barn-move history) is complete, browser-verified, and **tested and confirmed working by the owner in the running app (2026-08-28)**. **Cross-account RLS on `goat_breed_composition` / `goat_barn_moves`: confirmed (2026-08-29)** — see the cross-cutting note below. Minor UX refinements to family-tree / breed composition may follow later.
+`****` Health records (one `health_records` table, CRUD server actions, 3-step add/edit wizard, goat-profile Health tab) is **code-complete**: migration applied by the owner, types regenerated for real (`npm run gen:types`), `npm run build` + `tsc` clean. All three Section 9 open questions resolved by the owner (defer global page, plain-number doses/day, no cost roll-up). The **cross-account RLS** part of the Section 10 checklist is **confirmed (2026-08-29)** — see the cross-cutting note below; **the rest of the owner's own hands-on test of the Section 10 checklist is still outstanding** before 07 is `done`.
+`*****` Inventory (feed support + `/inventory` list page, Medicine/Feed tabs, add/edit/delete dialog, low-stock badges, `lib/inventory/stock.ts`) was built **ahead of 08/09 at the owner's request** and **tested and confirmed working by the owner in the running app (2026-08-29)**.
+`******` Dashboard & Analytics (`/` home page: herd composition + adult buck-to-doe ratio, farm-wide monthly weight-growth chart, health follow-ups due-soon list, low-stock widget, barn filter) was built **ahead of 09/11 at the owner's request** and **tested and confirmed working by the owner in the running app (2026-08-29)**. No migration (read-side only). New pure modules `lib/dashboard/{herd-composition,due-soon,weight-trend}.ts` — `dueSoon()` is written to be reused by spec 13's calendar. Task 1 updated `architecture-context.md`'s Data Model to describe the real `health_records` table. Sales-over-time widget is a labelled "coming soon" placeholder until 11 ships. Owner has minor refinements in mind — an update spec will follow. Task 1 (schema reconcile) was a no-op — `inventory_items` already matched `UPD-005`, no migration. Nav cleanup shipped with it: `/medicine` stub → `/inventory`; the `/vaccinations` and `/deworming` stubs were removed (spec 07 made those record types per-goat). **Expected to need refinement once real stock data is collected through farm use** (quantities, thresholds, units) — flagged in `progress-tracker.md`, no update spec filed yet. The `◀ next` marker stays on 08/09.
+
+> **Cross-account RLS check — confirmed 2026-08-29 (manual, owner-performed).** The owner created a second
+> test user, logged in as them, and confirmed a completely empty farm — none of the primary account's
+> goats, barns, health records, weight records, or inventory items were visible. This resolves the
+> standing "owner-only, needs their real credentials" RLS-isolation item for **every owner-scoped table
+> built so far**: `barns`, `goats`, `goat_barn_moves`, `goat_breed_composition`, `health_records`,
+> `weights`, `health_condition_presets`, `inventory_items`. Not an automated test — a manual check by the
+> owner in the running app. Future owner-scoped tables (09 `breedings`, spec 10's inventory extensions,
+> 11 `sales_purchases`, …) still need their own confirmation as they ship.
 
 ---
 
@@ -133,7 +145,8 @@ First real CRUD module — the pattern every later module copies. Built before g
 | `create/update/deleteBarn` server actions           | Back-end  | `done`        | each `revalidatePath('/barns')`                    |
 | `barn-form-dialog` (add/edit reuse)                 | Front-end | `done`        | `useActionState`/`useFormStatus`                   |
 | `delete-barn-dialog` (confirm)                      | Front-end | `done`        | —                                                  |
-| Owner authenticated CRUD + cross-account RLS test   | —         | `in progress` | **owner only** — needs their real login            |
+| Owner cross-account RLS test                        | —         | `done`        | confirmed manually by the owner 2026-08-29 (2nd test user sees an empty farm) |
+| Owner authenticated CRUD walk-through               | —         | `in progress` | **owner only** — needs their real login            |
 
 ---
 
@@ -183,25 +196,91 @@ Sire/dam links (in-app or external by name), ancestry / pedigree view, multi-bre
 | 6c — parent-based breed auto-computation (`composeFromParents`) | Back-end · logic    | `done` | pure averaging in `lib/goats/breeds.ts` (unit-checked incl. the 3-breed example); "Use parents' breed" ⇄ "Enter manually" toggle in the born-here form path, shown only when both parents are in-system goats, never auto-applied; browser-verified (Boer100 × Boer/Somali 50/50 → 75/25 live in the UI) |
 | 6d — barn-move history (`goat_barn_moves` table, move action, history list) | Both        | `done` | `goat_barn_moves` migration (`20260828000002`); `moveGoatToBarn` action (two-step, non-atomic) + `move-barn-dialog.tsx` (trigger built inside per `ERR-001`) + `barn-move-history.tsx` on the detail page; browser-verified |
 
-### 07 — health-records · Both · `planned` ◀ next
+### 07 — health-records · Both · `in progress` (code-complete; awaiting the owner's hands-on test)
 Health history, vaccinations, deworming, and medicine records; each dated, with next-due dates where relevant. **Depends on:** 05.
-*Likely split by record type:* `health_events`, `vaccinations`, `dewormings`, `medicine_records` — each schema/RLS `(Back-end)` + its form and list `(Front-end)`.
+The spec (`context/feature-specs/07-health-records.md`) consolidates all health events into **one** `health_records` table (record_type enum + course fields + next_due_date), rather than the per-record-type split originally proposed here — this also sidesteps the legacy `vaccinations` / `medicine_records` table-name collision, since `health_records` is a fresh, unused name. Built and shipped as one unit; code, migration and types are done, only the owner's in-app verification remains.
 
-### 08 — weight-records · Both · `planned`
-Weight entries per goat + growth chart (Recharts). **Depends on:** 05.
-*Likely split:* `weights` table + entry action `(Back-end)` · growth chart `(Front-end)`.
+| Sub-feature                                                        | Aspect    | Status | Notes                                                                                     |
+| ----------------------------------------------------------------- | --------- | ------ | ---------------------------------------------------------------------------------------- |
+| `health_records` table + 2 enums + indexes + RLS                   | Back-end  | `done` | `supabase/migrations/20260829000001_health_records.sql`; owner-run; `bigserial`/`bigint` + single `for all` policy per convention; legacy tables untouched |
+| Generated DB types regenerated                                     | Back-end  | `done` | real `npm run gen:types` after the migration; matches the hand-added stand-in exactly     |
+| `lib/health/records.ts` (pure type/status rules)                   | Back-end  | `done` | course vs follow-up types, label maps, `defaultStatusForType`                             |
+| `create/update/delete/listByGoat` server actions                   | Back-end  | `done` | `app/(app)/health/actions.ts`; conditional fields stripped server-side by record type    |
+| Add/edit dialog (3-step wizard, reuses `components/forms/`)         | Front-end | `done` | `components/health/health-record-form-dialog.tsx`; conditional fields per Section 6       |
+| Goat-profile Health tab (chronological, newest-first)              | Front-end | `done` | `app/(app)/goats/[id]/page.tsx` + `health-record-list.tsx` + `delete-health-record-dialog.tsx` |
+| Global `/health` page (all goats, filterable)                      | —         | deferred | Section 9 Q1 — owner chose to defer; `/health` keeps its placeholder                    |
+| Owner's cross-account RLS check on `health_records` | — | `done` | confirmed manually by the owner 2026-08-29 (2nd test user sees no health records) |
+| Owner's hands-on test of the rest of the Section 10 checklist | — | `in progress` | the owner tests every spec themselves before it closes; not yet done for 07 |
 
-### 09 — breeding-and-inbreeding · Both · `planned`
+**Follow-ups shipped as separate specs (not new roadmap rows):**
+
+- `context/update-specs/004-health-record-presets.md` (`UPD-004`, `done`) turned the health-record dialog's free-text Title field into a searchable **combobox** filtered by `record_type`, backed by a new `health_condition_presets` catalogue (seeded farm-wide defaults with `owner_id` null + the owner's own custom presets), with a "+ Add new" reveal that saves a typed title back as an owner-scoped preset. Migration `20260829000003_health_condition_presets.sql` with **split** select/insert/update/delete RLS (deliberate deviation from the single `for all` convention — see the spec's Section 6) so seeded global presets are readable but never editable/deletable by any authenticated user at the DB layer. Added the shadcn `combobox` + `input-group` primitives (`components/ui/`). Owner applied the migration, regenerated types (byte-identical to the stand-in), and confirmed it works in the running app (2026-08-29).
+- `context/update-specs/005-treatment-medication-inventory.md` (`UPD-005`, `done`) makes the health-record medication/product fields searchable comboboxes over a new **`inventory_items`** table (reusing `UPD-004`'s combobox), each option showing name + quantity and a "⚠ No stock recorded" warning at quantity 0 (still selectable). Migrations `20260829000004_inventory_items.sql` (`bigserial` id, single `for all` owner RLS, `inventory_item_type` enum `medicine`/`feed`, 13 drugs seeded at quantity 0) and `20260829000005_inventory_items_category.sql` (adds a nullable `medicine_category` enum column + backfill, so the **Deworming** step — which gained a new optional product field — offers only dewormers and the **Treatment** step offers everything else). `health_records.medication` stays plain text (no FK). Owner applied both migrations, regenerated types (byte-identical to the stand-in), and confirmed it works in the running app (2026-08-29). **`inventory_items` is forward-provisioned for spec 10 — see the Phase 3 Inventory note; spec 10 extends this table, it does not recreate it.**
+
+### 08 — weight-records · Both · `in progress` — ⏸ PAUSED at the owner's request
+Weight entries per goat + growth chart (Recharts — the project's first chart). **Depends on:** 05, 06.
+
+> ⏸ **Paused, not abandoned (owner's decision, 2026-08-29).** 08 is **code-complete** and its migration
+> is applied, but it is still **awaiting the owner's own hands-on click-through test** in the running app.
+> The owner has chosen to build **10 — inventory** first. **Do not do any further work on 08** — including
+> "improvements", polish, or re-verification — until the owner reports their test results. Its status stays
+> `in progress` (not `done`); this pause is a scheduling note only.
+Spec: `context/feature-specs/08-weight-records.md`. One `weights` table (`goat_id`, `weighed_on`,
+`weight_kg`, `notes`), CRUD server actions + a pure `lib/weight/weights.ts` delta helper, a single-form
+add/edit dialog (3 fields — no wizard, per the Form Length check), and the goat-profile Weight tab
+(growth `LineChart` + newest-first history list). No name collision with the legacy `weight_history`
+table — left untouched, same as 07's legacy health tables.
+
+### 09 — breeding-and-inbreeding · Both · `planned` — ⏸ DEFERRED at the owner's request
 Breeding records (sire/dam, mating, expected/actual kidding, offspring) + the relatedness check that warns on close matings. **Depends on:** 06.
 *Likely split:* `breedings` table + actions `(Back-end)` · relatedness/inbreeding check as a pure `lib` function `(Back-end · logic)` · warning + override-confirm UI `(Front-end)`.
+
+> ⏸ **Deferred, not abandoned (owner's decision, 2026-08-29).** 09 has **not been started** and no spec
+> is written yet. The owner has chosen to build **10 — inventory** ahead of it. **Do not begin 09** until
+> the owner explicitly says to resume it. It remains the real next-up item (with 08's outstanding test),
+> not 11.
 
 ---
 
 ## Phase 3 — Operations
 
-### 10 — inventory · Both · `planned`
+### 10 — inventory · Both · `done` — built ahead of 08/09 at the owner's request
 Medicine and feed stock, quantities, low-stock awareness. **Depends on:** 03.
-*Likely single unit unless it grows:* `inventory_items` table + actions `(Back-end)` · list + low-stock UI `(Front-end)`.
+Built as a single unit: extended the forward-provisioned `inventory_items` with feed support (no schema
+change — Task 1 was a no-op), a `/inventory` list page (Medicine/Feed tabs, table→card responsive,
+low-stock badges, per-tab empty states), `list/create/update/deleteInventoryItem` server actions, one
+add/edit dialog + delete confirm, and `lib/inventory/stock.ts` (`isLowStock` + `isOutOfStock` +
+`stockStatus`). Nav cleanup shipped with it — `/medicine` → `/inventory`; `/vaccinations` and
+`/deworming` stub routes removed (spec 07 made those per-goat). **Owner tested it in the running app and
+confirmed it works (2026-08-29).**
+
+> ▶ **Built out of order (owner's decision, 2026-08-29).** The normal order is 08 → 09 → 10; the owner
+> built 10 first, then **12 — dashboard-analytics** (also out of order, ahead of 11), both while 08
+> awaits their test and 09 is deferred. Both are now `done` and owner-tested. The `◀ next` marker stays
+> on **08 / 09** — they remain the real next-up items; 13 is **not** automatically next just because 12
+> shipped.
+
+> **Expected refinement (flagged, not yet specced):** once the owner has collected real stock data
+> through actual farm use, the quantities, low-stock thresholds, and possibly the unit list are likely
+> to need adjusting. No update spec is filed yet — this note just keeps the expectation from being lost.
+
+> ⚠️ **`inventory_items` ALREADY EXISTS — do not recreate it.** *(Historical note — 10 shipped 2026-08-29
+> with no migration; Task 1 confirmed the table already matched. Kept here for context.)* `UPD-005`
+> (`context/update-specs/005-treatment-medication-inventory.md`, 2026-08-29) forward-provisioned this
+> table early so the health-record medication/product fields had a real drug list to pick from. What
+> already exists (migrations `supabase/migrations/20260829000004_inventory_items.sql` +
+> `20260829000005_inventory_items_category.sql`):
+> `inventory_items` (`bigserial` id, `owner_id`, `type inventory_item_type` enum = `medicine` / `feed`,
+> `name`, `quantity numeric(10,2) default 0`, `unit` nullable, `low_stock_threshold` nullable,
+> `category medicine_category` nullable = `antibiotic` / `vitamin_support` / `anti_inflammatory` /
+> `dewormer` / `other`, `created_at`, `unique (owner_id, type, name)`), a single `for all` owner RLS
+> policy, a `type` index, and the `inventory_item_type` + `medicine_category` enums.
+> It is seeded with 13 medicines at `quantity 0` (each backfilled with a `category`) and is currently
+> **medicine-only in practice** (feed support, quantity/restock editing, low-stock thresholds & alerts,
+> a real category picker, and a dedicated Inventory screen were all explicitly deferred to spec 10).
+> **Spec 10 must read `UPD-005` first and EXTEND this table with an additive migration — not
+> `create table` it again.** The `low_stock_threshold` / `unit` columns, the `feed` enum value, and the
+> `other` category value are already present but unused, ready for 10 to wire up.
 
 ### 11 — sales-and-purchases · Both · `planned`
 Sale/purchase records, optionally linked to goats. **Depends on:** 05.
@@ -211,9 +290,51 @@ Sale/purchase records, optionally linked to goats. **Depends on:** 05.
 
 ## Phase 4 — Insight
 
-### 12 — dashboard-analytics · Both · `planned`
+### 12 — dashboard-analytics · Both · `done` — built ahead of 09/11 at the owner's request, owner-tested 2026-08-29
 Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), weight growth, vaccinations/deworming due soon, sales over time, stock levels; barn filter. **Depends on:** the core data modules.
 *Likely split:* aggregation queries / derivations `(Back-end · logic)` · each chart & the barn filter `(Front-end)`.
+
+> ✅ **`UPD-006` (Dashboard Redesign & Herd Population Timeline) — `done`, owner-verified 2026-08-29.**
+> `context/update-specs/006-dashboard-redesign-and-herd-population.md` layered on this `done` feature: a
+> mobile-first card/donut redesign with an extended `top-bar.tsx` (back-button / filter / action-icon
+> slots; action icon = a CSV export of the on-screen summary — the v1 stand-in until spec 16), plus a new
+> **"Herd growth"** timeline section backed by a new `herd_events` table
+> (`supabase/migrations/20260829000006_herd_events.sql`, owner-run) + a `log_herd_event` RPC that keeps a
+> Sale/Death event and the goat's `status` in sync atomically. **Cross-account RLS on `herd_events` still
+> needs the owner's second-account confirmation** as it ships (standing rule for new owner-scoped tables).
+> When drafted, **spec 11 must integrate with `herd_events` rather than creating a second "a goat left the
+> herd" concept** — same forward-provisioning pattern as `UPD-005`'s inventory note.
+>
+> **Amendment 2026-08-29 (owner request, via `UPD-007`):** the entire **"Herd growth" dashboard section
+> is deactivated** — the running-total chart plus the "Log herd event" trigger are hidden together as
+> one unit behind `const SHOW_HERD_GROWTH_SECTION = false;` in `app/(app)/page.tsx`. **Deactivation, not
+> deletion** — `herd_events`, the `log_herd_event` RPC, `lib/dashboard/herd-timeline.ts`,
+> `createHerdEvent`, and the dialog components are all intact; flip the flag to restore. Log Herd Event
+> is not currently reachable from the dashboard. Detail in `006-*.md` §14.
+
+> 🔧 **`UPD-007` (Newborn Kids Period Chart & Event Type Simplification) — `in progress`.**
+> `context/update-specs/007-newborn-period-chart-and-event-simplification.md`. No migration. Adds
+> `lib/dashboard/newborn-periods.ts` (`computeNewbornsByPeriod` — pure, emits every month in the selected
+> window including zero-count months; counts every `born_here` goat by DOB regardless of life stage), a
+> **"Newborn Kids"** dashboard bar chart with a **selectable end date (default today)** + a 3 / 6 /
+> 12-month window applied backward from it (max 12 months) as an early proxy for breeding-season patterns
+> until spec 09 exists, and a presentation-only reordering of the Log Herd Event type picker (Sale/Death
+> primary; Other addition/removal grouped as secondary — enum/schema/validation untouched).
+> **Two owner amendments (2026-08-29), folded into the `006` / `007` spec files (no new spec):** the
+> selectable end date above, and **deactivating the entire "Herd growth" section** (see the `UPD-006`
+> note above — hidden behind a flag, all code/schema kept). A separate owner concern that the Log Herd
+> Event form is "not optimal" beyond the ordering is noted as an open follow-up in `progress-tracker.md`.
+
+> ▶ **Built out of order (owner's decision, 2026-08-29).** 12 is being built next, ahead of `09` (deferred)
+> and `11` (not started). The **Sales-over-time widget is deferred until `11` exists** — the dashboard
+> ships with a clearly-labelled "coming soon" placeholder tile in its place (owner's choice, 2026-08-29).
+> The `◀ next` marker stays on `08` / `09`.
+
+**Task 1 result (2026-08-29):** confirmed from the generated types that spec 07 built health records as
+**one `health_records` table with a `record_type` enum + a `next_due_date` column** — not the separate
+`vaccinations` / `dewormings` tables in `architecture-context.md`'s original sketch (those names belong to
+the untouched legacy prototype tables). `architecture-context.md`'s Data Model section was updated to
+match reality so spec 13 (calendar) builds its due-date query against accurate docs.
 
 ### 13 — calendar · Both · `planned`
 Month/week view merging vaccination & deworming due dates, expected kidding, feeding schedule, and to-dos. **Depends on:** 07, 09, 14.

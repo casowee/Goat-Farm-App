@@ -310,6 +310,10 @@ Click-through in the running app (plain-language checks for the owner):
 
 Owner-only (needs their real login, like barns): authenticated CRUD and RLS isolation across two
 accounts. Note it as the owner's manual step; don't block the code `done` on it.
+**RLS isolation across two accounts: ✅ confirmed 2026-08-29** — the owner logged in as a second test
+user and saw a completely empty farm (no goats/barns/health/weight/inventory from the primary account);
+manual owner-performed check, not automated. Authenticated CRUD walk-through still the owner's manual
+step.
 
 ## 14. Roadmap & progress updates — the agent must do these
 

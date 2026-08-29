@@ -1,13 +1,11 @@
 import {
   Baby,
-  Bug,
   HeartPulse,
   LayoutDashboard,
+  Package,
   PawPrint,
-  Pill,
   Scale,
   ShoppingCart,
-  Syringe,
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
@@ -22,11 +20,13 @@ export const navItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Barns", href: "/barns", icon: Warehouse },
   { label: "Goat Records", href: "/goats", icon: PawPrint },
-  { label: "Medicine Records", href: "/medicine", icon: Pill },
+  // Spec 10 repurposed the `/medicine` stub into farm-wide Inventory.
+  { label: "Inventory", href: "/inventory", icon: Package },
   { label: "Health History", href: "/health", icon: HeartPulse },
   { label: "Breeding History", href: "/breeding", icon: Baby },
   { label: "Weight History", href: "/weight", icon: Scale },
-  { label: "Vaccinations", href: "/vaccinations", icon: Syringe },
-  { label: "Deworming", href: "/deworming", icon: Bug },
+  // The `/vaccinations` and `/deworming` stubs were removed in spec 10 —
+  // spec 07 made both of those record types per-goat entries on the Health tab,
+  // so the top-level pages were dead ends.
   { label: "Sales & Purchases", href: "/sales", icon: ShoppingCart },
 ];

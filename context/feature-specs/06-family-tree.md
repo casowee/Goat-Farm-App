@@ -345,6 +345,8 @@ Click-through (plain-language checks):
    warnings, not just errors).
 
 Owner-only: cross-account RLS on the new tables (needs the owner's real login) — note as a manual step.
+**✅ Confirmed 2026-08-29** — the owner logged in as a second test user and saw a completely empty farm,
+covering `goat_breed_composition` and `goat_barn_moves` (manual owner-performed check, not automated).
 
 ## 14. Roadmap & progress updates — the agent must do these
 
@@ -386,9 +388,12 @@ most reversible change, consistent with existing conventions. **None require ano
 
 **Owner sign-off (2026-08-28):** the owner tested all four sub-features directly in the running app and
 confirmed they work. Feature 06 is `done`. The owner has noted that minor refinements to the family-tree
-/ breed-composition UX may follow later — no new spec filed yet (see `progress-tracker.md`). The only
-standing item is the cross-account RLS check on the two new tables, which needs a second real login
-(the same outstanding item as every prior owner-scoped table).
+/ breed-composition UX may follow later — no new spec filed yet (see `progress-tracker.md`).
+
+**Cross-account RLS check — ✅ confirmed 2026-08-29 (manual, owner-performed).** The owner created a
+second test user, logged in as them, and confirmed a completely empty farm — covering
+`goat_breed_composition` and `goat_barn_moves` along with every other owner-scoped table built so far.
+Not an automated test. Nothing outstanding for 06.
 
 | # | Open question | Decision | One-line reason |
 |---|---------------|----------|-----------------|
@@ -415,7 +420,8 @@ generated types). **6a needs no migration** — only the form, actions, pure wal
   Goat dialog's Parents section renders, the in-system ⇄ external toggle works, the pedigree tree renders
   goat / external / unknown nodes and breed labels, an intentional cycle did not hang the page, and there
   were **zero console warnings or errors** on first paint at 1280px and 390px. Owner's authenticated
-  save/RLS test still outstanding (same as every prior goat session).
+  save test still outstanding (same as every prior goat session); the cross-account RLS check is
+  ✅ confirmed (2026-08-29, owner's manual second-account check).
 - **6d — barn-move history: DONE.** Owner ran `20260828000002_goat_barn_moves.sql`. Added
   `moveGoatToBarn(goatId, formData)` to `app/(app)/goats/actions.ts` (two-step: update `goats.barn_id`,
   then insert the `goat_barn_moves` row — non-atomic per §16 decision 6; rejects a move to the same barn,
@@ -466,5 +472,7 @@ generated types). **6a needs no migration** — only the form, actions, pure wal
   `composeFromParents`, existing pure / 50-50 goats still formatting correctly after the migration, the
   Move-to-another-barn flow + history, tag labels throughout, dark-desert theme at iPhone width, and
   **zero console warnings or errors** (not just errors) on first paint of every new dialog.
-- **Owner-only, still outstanding:** an authenticated save and cross-account RLS check on the two new
-  tables (`goat_breed_composition`, `goat_barn_moves`) — needs the owner's real login, same as barns/goats.
+- **Owner-only:** an authenticated save on the two new tables (`goat_breed_composition`,
+  `goat_barn_moves`) — needs the owner's real login, same as barns/goats. The **cross-account RLS check
+  is ✅ confirmed (2026-08-29)** — the owner logged in as a second test user and saw an empty farm
+  (manual owner-performed check, not automated).

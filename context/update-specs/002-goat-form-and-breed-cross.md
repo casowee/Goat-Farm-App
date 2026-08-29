@@ -200,9 +200,11 @@ Savanna, and preview "= 87.5% Somali (Galla) × 12.5% Savanna" preserved exactly
 50%) until the owner would touch a parent-breed select. Editing the stubbed pure-breed goat opened showing
 "Boer (purebred)". Dark-desert theme and phone width (390px) rendered correctly throughout. Zero console
 warnings or errors were captured by Playwright across all of the above (see Resolution notes for the
-`ERR-001` hydration-specific check). Full authenticated CRUD (an actual successful save/persist) still
-needs the owner's own logged-in test, same outstanding item as every prior goat/barn session — validation
-paths (blank tag, same-breed cross) were confirmed instead, since they run before any Supabase call.
+`ERR-001` hydration-specific check). Validation paths (blank tag, same-breed cross) were confirmed by the
+agent, since they run before any Supabase call. The authenticated Save path was subsequently covered by
+the owner's `UPD-003` sign-off (same goat form). **Cross-account RLS: ✅ confirmed 2026-08-29** — the
+owner logged in as a second test user and saw a completely empty farm (manual owner-performed check, not
+automated).
 
 ## 13. Resolution / final state
 
