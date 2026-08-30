@@ -18,6 +18,14 @@ export interface HerdCompositionGoat {
   sex: GoatSex;
   reproductive_state: ReproductiveState;
   date_of_birth: string;
+  /**
+   * `goat_status`. Only 'active' goats are part of the current herd — Sold /
+   * Deceased / Stolen goats are excluded from every count here (total, per
+   * stage, sex split, buck-to-doe ratio), unconditionally. This is a
+   * correctness rule of the count itself, not a display filter
+   * (UPD-008 amendment, 2026-08-30).
+   */
+  status: string;
 }
 
 export interface HerdComposition {
@@ -44,11 +52,15 @@ export function computeHerdComposition(
   goats: HerdCompositionGoat[],
   now: Date = new Date(),
 ): HerdComposition {
+  // Only active goats count toward the current herd — a sold / deceased /
+  // stolen goat has left, regardless of any list-level status filter.
+  const activeGoats = goats.filter((goat) => goat.status === "active");
+
   const byStage = emptyByStage();
   let totalMale = 0;
   let totalFemale = 0;
 
-  for (const goat of goats) {
+  for (const goat of activeGoats) {
     const stage = deriveGoatStage({
       sex: goat.sex,
       reproductiveState: goat.reproductive_state,
@@ -61,7 +73,7 @@ export function computeHerdComposition(
   }
 
   return {
-    total: goats.length,
+    total: activeGoats.length,
     byStage,
     totalMale,
     totalFemale,

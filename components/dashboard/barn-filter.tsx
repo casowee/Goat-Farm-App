@@ -16,8 +16,7 @@ interface BarnFilterProps {
 
 /**
  * Sets `?barn=<id>` on the dashboard home route (or clears it for "all barns").
- * Same pattern as `components/goats/barn-filter.tsx`, just pointed at `/`. The
- * dashboard page reads the param server-side and scopes herd composition,
+ * The dashboard page reads the param server-side and scopes herd composition,
  * weight growth and the due-soon list to it — stock levels are left alone.
  */
 export function BarnFilter({ barns, value }: BarnFilterProps) {

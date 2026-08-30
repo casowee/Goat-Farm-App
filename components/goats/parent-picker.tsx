@@ -17,6 +17,12 @@ export interface ParentPickerGoat {
   tag: string;
   name: string | null;
   sex: "male" | "female";
+  /** `goat_status` — used by the form's duplicate-tag check (UPD-008), which
+   *  only considers active goats. The parent pickers themselves ignore it. */
+  status: string;
+  /** UPD-010 — a system-generated newborn temp tag; excluded from the form's
+   *  duplicate-tag check. The parent pickers themselves ignore it. */
+  is_temp_tag?: boolean;
   /** Breed composition, so the form can compute a born-here goat's breed (6c). */
   composition: { breed: string; pct: number }[];
 }

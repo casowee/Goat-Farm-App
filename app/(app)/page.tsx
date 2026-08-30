@@ -223,8 +223,9 @@ export default async function DashboardPage({
             <CardTitle>Herd composition</CardTitle>
             <CardDescription>
               {hasBarnFilter
-                ? `Goats in ${barnLabel}, by stage.`
-                : "All goats, by stage."}
+                ? `Active goats in ${barnLabel}, by stage.`
+                : "Active goats, by stage."}{" "}
+              Sold, deceased and stolen goats are not counted.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2, Plus } from "lucide-react";
 import { createGoat, updateGoat } from "@/app/(app)/goats/actions";
@@ -43,6 +43,8 @@ import {
   type ParentPickerGoat,
   type ParentSelection,
 } from "@/components/goats/parent-picker";
+import { findTagMatches } from "@/lib/goats/tag";
+import { generateTempTag } from "@/lib/goats/temp-tag";
 
 type Goat = Database["public"]["Tables"]["goats"]["Row"];
 type GoatOrigin = Database["public"]["Enums"]["goat_origin"];
@@ -65,10 +67,22 @@ interface GoatFormDialogProps {
   barns: { id: number; name: string }[];
   /** The owner's goats, for the sire / dam pickers (feature 06). */
   goats?: ParentPickerGoat[];
+  /**
+   * UPD-010 — "Add newborn kid" mode. When set, this launches the same wizard
+   * from a doe's own detail page with the Dam locked to that goat, Origin locked
+   * to "Born on the farm", and the Tag step replaced by a read-only preview of
+   * an auto-generated `{dam_tag}-K{n}` temporary tag. Everything else (sex, DOB,
+   * sire, breed, notes) behaves exactly as the normal wizard.
+   */
+  newbornDam?: { id: number; tag: string };
   triggerLabel: string;
   triggerIcon?: boolean;
   triggerVariant?: "default" | "outline";
   triggerSize?: "default" | "sm";
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function SubmitButton({ label }: { label: string }) {
@@ -116,13 +130,31 @@ export function GoatFormDialog({
   breedComposition = [],
   barns,
   goats = [],
+  newbornDam,
   triggerLabel,
   triggerIcon,
   triggerVariant = "default",
   triggerSize = "default",
 }: GoatFormDialogProps) {
   const isEdit = Boolean(goat);
+  const isNewborn = Boolean(newbornDam) && !isEdit;
   const initialComp = sortedComp(breedComposition);
+
+  // UPD-010 — the next unique `{dam_tag}-K{n}` value, recomputed whenever the
+  // owner's goat list changes (so adding a second kid in a row gets -K2). The
+  // server action regenerates this on save and is the real authority; this is
+  // only the read-only preview shown in place of the Tag input.
+  const newbornTag = useMemo(
+    () =>
+      newbornDam
+        ? generateTempTag(
+            newbornDam.tag,
+            goats.map((g) => g.tag),
+          )
+        : "",
+    [newbornDam, goats],
+  );
+  const initialTag = isNewborn ? newbornTag : (goat?.tag ?? "");
 
   const [open, setOpen] = useState(false);
   // Bumped every time the dialog opens so the parent pickers (which keep their
@@ -134,11 +166,16 @@ export function GoatFormDialog({
 
   // Step 1 fields held in state so per-step validation can gate "Next". They
   // still carry `name` attributes, so the single final submit collects them.
-  const [tag, setTag] = useState(goat?.tag ?? "");
+  const [tag, setTag] = useState(initialTag);
   const [name, setName] = useState(goat?.name ?? "");
-  const [dob, setDob] = useState(goat?.date_of_birth ?? "");
+  const [dob, setDob] = useState(
+    goat?.date_of_birth ?? (isNewborn ? todayIso() : ""),
+  );
   const [sex, setSex] = useState<GoatSex>(goat?.sex ?? "female");
   const [origin, setOrigin] = useState<GoatOrigin>(goat?.origin ?? "born_here");
+  // UPD-010 — the promote toggle, shown only when editing a temp-tagged goat.
+  // On by default; turning it off (with a real tag entered) promotes the goat.
+  const [isTempTag, setIsTempTag] = useState(goat?.is_temp_tag ?? false);
   // Step 2 — barn is required, so it also gates its step.
   const [barnId, setBarnId] = useState(
     goat?.barn_id != null ? String(goat.barn_id) : "",
@@ -164,10 +201,19 @@ export function GoatFormDialog({
     name: goat?.sire_name ?? null,
   });
   const [damSel, setDamSel] = useState<ParentSelection>({
-    goatId: goat?.dam_id ?? null,
+    goatId: newbornDam?.id ?? goat?.dam_id ?? null,
     name: goat?.dam_name ?? null,
   });
   const [useParentsBreed, setUseParentsBreed] = useState(false);
+
+  // UPD-008 (8b) — non-blocking duplicate-tag warning. Other goats whose tag
+  // matches the one being typed once case and leading zeros are ignored
+  // ("MJ02" / "MJ2" / "mj2"), excluding this goat on an edit. This NEVER blocks
+  // save — it is a warning, not a validation rule (spec Section 7).
+  const duplicateTagMatches = useMemo(
+    () => findTagMatches(tag, goats, goat?.id),
+    [tag, goats, goat?.id],
+  );
 
   const submit = isEdit ? updateGoat.bind(null, goat!.id) : createGoat;
 
@@ -183,11 +229,12 @@ export function GoatFormDialog({
   );
 
   function resetFromGoat() {
-    setTag(goat?.tag ?? "");
+    setTag(isNewborn ? newbornTag : (goat?.tag ?? ""));
     setName(goat?.name ?? "");
-    setDob(goat?.date_of_birth ?? "");
+    setDob(goat?.date_of_birth ?? (isNewborn ? todayIso() : ""));
     setSex(goat?.sex ?? "female");
     setOrigin(goat?.origin ?? "born_here");
+    setIsTempTag(goat?.is_temp_tag ?? false);
     setBarnId(goat?.barn_id != null ? String(goat.barn_id) : "");
     setBreedChoice(initialBreedChoice(initialComp));
     setOtherBreed(initialOtherBreed(initialComp));
@@ -195,7 +242,10 @@ export function GoatFormDialog({
     setCrossSecond(initialComp.length >= 2 ? initialComp[1].breed : "");
     setCrossTouched(false);
     setSireSel({ goatId: goat?.sire_id ?? null, name: goat?.sire_name ?? null });
-    setDamSel({ goatId: goat?.dam_id ?? null, name: goat?.dam_name ?? null });
+    setDamSel({
+      goatId: newbornDam?.id ?? goat?.dam_id ?? null,
+      name: goat?.dam_name ?? null,
+    });
     setUseParentsBreed(false);
     setParentsResetKey(0);
   }
@@ -275,7 +325,16 @@ export function GoatFormDialog({
   const dobDate = dob ? new Date(dob) : null;
   const dobValid =
     !!dobDate && !Number.isNaN(dobDate.getTime()) && dobDate <= new Date();
-  const step1Valid = tag.trim() !== "" && dobValid;
+
+  // UPD-010 — promoting a temp-tagged goat (toggle off) requires a real tag,
+  // different from the auto-generated one, entered in the same save.
+  const wasTempTag = isEdit && Boolean(goat?.is_temp_tag);
+  const promoting = wasTempTag && !isTempTag;
+  const tagIsReal =
+    !promoting || (tag.trim() !== "" && tag.trim() !== (goat?.tag ?? "").trim());
+  const step1Valid = tag.trim() !== "" && tagIsReal && dobValid;
+
+  const tagReadOnly = isNewborn || (wasTempTag && isTempTag);
   const step2Valid = resolvedComposition != null && barnId !== "";
 
   const steps: WizardStepDef[] = [
@@ -289,7 +348,9 @@ export function GoatFormDialog({
   function handleSkipParents() {
     if (!isEdit) {
       setSireSel({ goatId: null, name: null });
-      setDamSel({ goatId: null, name: null });
+      // In newborn mode the dam is locked to the doe this was launched from —
+      // skipping only clears the (optional) sire.
+      if (!isNewborn) setDamSel({ goatId: null, name: null });
       setParentsResetKey((k) => k + 1);
     }
     wizard.next();
@@ -330,11 +391,19 @@ export function GoatFormDialog({
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Goat" : "Add Goat"}</DialogTitle>
+          <DialogTitle>
+            {isEdit
+              ? "Edit Goat"
+              : isNewborn
+                ? "Add newborn kid"
+                : "Add Goat"}
+          </DialogTitle>
           <DialogDescription>
             {isEdit
               ? "Update this goat's details."
-              : "Register a new goat to your farm."}
+              : isNewborn
+                ? `Record a new kid born to ${newbornDam!.tag}. A temporary tag is assigned now — give it a real tag later.`
+                : "Register a new goat to your farm."}
           </DialogDescription>
         </DialogHeader>
 
@@ -365,24 +434,34 @@ export function GoatFormDialog({
             {/* Step 1 — Identity & Origin */}
             <div className={stepClass(0)}>
               <div className="flex flex-col gap-2">
-                <label className="text-sm text-copy-secondary">Origin</label>
-                <ToggleGroup
-                  value={[origin]}
-                  onValueChange={handleOriginChange}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <ToggleGroupItem value="born_here" className="flex-1">
-                    Born on the farm
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="purchased" className="flex-1">
-                    Purchased
-                  </ToggleGroupItem>
-                </ToggleGroup>
+                {isNewborn ? (
+                  // UPD-010 — a newborn kid is obviously born on the farm.
+                  <p className="text-sm text-copy-secondary">
+                    Born on the farm — to{" "}
+                    <span className="text-copy-primary">{newbornDam!.tag}</span>
+                  </p>
+                ) : (
+                  <>
+                    <label className="text-sm text-copy-secondary">Origin</label>
+                    <ToggleGroup
+                      value={[origin]}
+                      onValueChange={handleOriginChange}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <ToggleGroupItem value="born_here" className="flex-1">
+                        Born on the farm
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="purchased" className="flex-1">
+                        Purchased
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </>
+                )}
                 <input type="hidden" name="origin" value={origin} />
               </div>
 
-              {origin === "purchased" && (
+              {!isNewborn && origin === "purchased" && (
                 <div className="flex flex-col gap-2">
                   <label
                     htmlFor="purchase_date"
@@ -406,13 +485,75 @@ export function GoatFormDialog({
                 <label htmlFor="tag" className="text-sm text-copy-secondary">
                   Tag
                 </label>
+
+                {wasTempTag && (
+                  // UPD-010 — promote a temp-tagged kid to a permanent tag.
+                  <ToggleGroup
+                    value={[isTempTag ? "temp" : "permanent"]}
+                    onValueChange={(values) => {
+                      const next = values[0];
+                      if (next === "temp") setIsTempTag(true);
+                      if (next === "permanent") setIsTempTag(false);
+                    }}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <ToggleGroupItem value="temp" className="flex-1">
+                      Temporary tag
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="permanent" className="flex-1">
+                      Permanent tag
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                )}
+
                 <Input
                   id="tag"
                   name="tag"
                   value={tag}
                   onChange={(e) => setTag(e.target.value)}
+                  readOnly={tagReadOnly}
+                  aria-readonly={tagReadOnly}
+                  className={tagReadOnly ? "text-copy-muted" : undefined}
                   required
                 />
+
+                {isNewborn && (
+                  <p className="text-xs text-copy-muted">
+                    Temporary tag: <span className="text-copy-secondary">{tag}</span>{" "}
+                    — you can assign a real tag later by editing this goat.
+                  </p>
+                )}
+                {wasTempTag && isTempTag && (
+                  <p className="text-xs text-copy-muted">
+                    This kid still has a temporary tag. Switch to “Permanent tag”
+                    and enter a real one to promote it.
+                  </p>
+                )}
+                {promoting && !tagIsReal && (
+                  <p className="text-xs text-warning">
+                    Enter a permanent tag (different from the temporary one) to
+                    promote this goat.
+                  </p>
+                )}
+
+                {!isNewborn && !isTempTag && duplicateTagMatches.length > 0 && (
+                  <p className="text-xs text-warning">
+                    This tag looks the same as an existing goat&apos;s:{" "}
+                    {duplicateTagMatches
+                      .map((g) => (g.name ? `${g.tag} (${g.name})` : g.tag))
+                      .join(", ")}
+                    . You can still save if this is a different goat.
+                  </p>
+                )}
+
+                {(isNewborn ||
+                  (wasTempTag && isTempTag)) && (
+                  <input type="hidden" name="is_temp_tag" value="true" />
+                )}
+                {wasTempTag && !isTempTag && (
+                  <input type="hidden" name="is_temp_tag" value="false" />
+                )}
               </div>
               <div className="flex flex-col gap-2">
                 <label htmlFor="name" className="text-sm text-copy-secondary">
@@ -637,6 +778,7 @@ export function GoatFormDialog({
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="sold">Sold</SelectItem>
                     <SelectItem value="deceased">Deceased</SelectItem>
+                    <SelectItem value="stolen">Stolen</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -671,8 +813,9 @@ export function GoatFormDialog({
             {/* Step 3 — Parents (optional, skippable) */}
             <div className={stepClass(2)}>
               <p className="text-xs text-copy-muted">
-                Optional — pick a goat already in the system or type an outside
-                name. Lineage can be added or changed any time later.
+                {isNewborn
+                  ? "The dam is set to the doe you started from. The sire is optional — pick a goat already in the system or type an outside name."
+                  : "Optional — pick a goat already in the system or type an outside name. Lineage can be added or changed any time later."}
               </p>
               <ParentPicker
                 key={`sire-${openNonce}-${parentsResetKey}-${origin}`}
@@ -686,18 +829,43 @@ export function GoatFormDialog({
                 excludeGoatId={goat?.id}
                 onSelectionChange={setSireSel}
               />
-              <ParentPicker
-                key={`dam-${openNonce}-${parentsResetKey}-${origin}`}
-                label="Dam"
-                fieldPrefix="dam"
-                goats={goats}
-                preferredSex="female"
-                defaultMode={origin === "purchased" ? "external" : "in_system"}
-                initialGoatId={parentsResetKey === 0 ? goat?.dam_id : null}
-                initialName={parentsResetKey === 0 ? goat?.dam_name : null}
-                excludeGoatId={goat?.id}
-                onSelectionChange={setDamSel}
-              />
+              {isNewborn ? (
+                // UPD-010 — the dam is locked to the doe this was launched from.
+                <div className="flex flex-col gap-2 rounded-xl border border-surface-border p-3">
+                  <span className="text-sm text-copy-secondary">Dam</span>
+                  <p className="text-sm text-copy-primary">
+                    {(() => {
+                      const d = goats.find((g) => g.id === newbornDam!.id);
+                      return d?.name
+                        ? `${d.tag} — ${d.name}`
+                        : newbornDam!.tag;
+                    })()}
+                  </p>
+                  <p className="text-xs text-copy-muted">
+                    Locked for a newborn kid — this is the doe whose profile you
+                    added it from.
+                  </p>
+                  <input
+                    type="hidden"
+                    name="dam_id"
+                    value={String(newbornDam!.id)}
+                  />
+                  <input type="hidden" name="dam_name" value="" />
+                </div>
+              ) : (
+                <ParentPicker
+                  key={`dam-${openNonce}-${parentsResetKey}-${origin}`}
+                  label="Dam"
+                  fieldPrefix="dam"
+                  goats={goats}
+                  preferredSex="female"
+                  defaultMode={origin === "purchased" ? "external" : "in_system"}
+                  initialGoatId={parentsResetKey === 0 ? goat?.dam_id : null}
+                  initialName={parentsResetKey === 0 ? goat?.dam_name : null}
+                  excludeGoatId={goat?.id}
+                  onSelectionChange={setDamSel}
+                />
+              )}
             </div>
 
             {/* Step 4 — Notes & Review */}
@@ -717,7 +885,15 @@ export function GoatFormDialog({
                 <p className="text-xs font-medium tracking-wide text-copy-muted uppercase">
                   Review
                 </p>
-                <ReviewRow label="Tag" value={tag.trim() || "—"} />
+                <ReviewRow
+                  label="Tag"
+                  value={
+                    (tag.trim() || "—") +
+                    (isNewborn || (wasTempTag && isTempTag)
+                      ? " (temporary)"
+                      : "")
+                  }
+                />
                 {name.trim() && <ReviewRow label="Name" value={name.trim()} />}
                 <ReviewRow
                   label="Origin"
@@ -758,7 +934,11 @@ export function GoatFormDialog({
           <div className="border-t border-surface-border pt-4">
             {wizard.isLast ? (
               <WizardNav onBack={wizard.back}>
-                <SubmitButton label={isEdit ? "Save" : "Add Goat"} />
+                <SubmitButton
+                  label={
+                    isEdit ? "Save" : isNewborn ? "Add kid" : "Add Goat"
+                  }
+                />
               </WizardNav>
             ) : (
               <WizardNav

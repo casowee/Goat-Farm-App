@@ -41,7 +41,7 @@ Supabase is the single backend. The web app and any future iOS / Android app tal
 Every owned table has an `owner` column referencing the Supabase auth user, used by row-level security.
 
 - `barns` — name, category (does / bucks / kids / mixed / other), notes.
-- `goats` — name / tag, breed, sex, date of birth, reproductive state (intact / castrated), status (active / sold / deceased), `barn_id` (the goat's current barn — nullable in the database, but always set by the registration screen), photo URL, notes, `sire_id` and `dam_id` (self-referencing links to other goats, nullable), and `sire_name` / `dam_name` for external parents not in the system.
+- `goats` — name / tag, breed, sex, date of birth, reproductive state (intact / castrated), status (active / sold / deceased / **stolen** — `stolen` added by `UPD-008`), `barn_id` (the goat's current barn — nullable in the database, but always set by the registration screen), photo URL, notes, `sire_id` and `dam_id` (self-referencing links to other goats, nullable), and `sire_name` / `dam_name` for external parents not in the system.
 - `goat_barn_moves` — goat, from barn, to barn, and date (optional history of a goat's moves between barns).
 - `health_records` — **one table for every health event** (spec 07, migration `20260829000001_health_records.sql`).
   `record_type` enum (`vaccination` / `illness` / `treatment` / `deworming` / `checkup` / `injury` / `surgery`),
@@ -58,10 +58,14 @@ Every owned table has an `owner` column referencing the Supabase auth user, used
 - `inventory_items` — type (medicine / feed), name, quantity, unit, low-stock threshold, `category` (medicine only). *(`UPD-005` + spec 10.)*
 - `herd_events` — `event_type` enum (`sale` / `death` / `other_addition` / `other_removal` — **not** birth/purchase,
   which stay derived from goat records), optional `goat_id`, `event_date`, `note`. Feeds the dashboard's
-  herd-population timeline. Written via the `log_herd_event(...)` RPC, which also flips a linked goat's
-  `status` to `sold` / `deceased` for a Sale / Death in the same call. *(`UPD-006`,
-  migration `20260829000006_herd_events.sql`.)* Spec 11 (sales & purchases) should integrate with this,
-  not duplicate it.
+  herd-population timeline. *(`UPD-006`, migration `20260829000006_herd_events.sql`.)* Spec 11 (sales &
+  purchases) should integrate with this, not duplicate it.
+  `UPD-008` (migration `20260830000002_record_goat_departure.sql`) added the `record_goat_departure(...)`
+  RPC — the single atomic path for a Sale / Death / **Stolen** departure: it writes `goats.status`
+  (`sold` / `deceased` / `stolen`), the `herd_events` row (`sale` / `death` / `other_removal`), and, for a
+  death with a cause, a `health_records` row. Both `UPD-008`'s reason-based removal dialog and `UPD-006`'s
+  Log Herd Event form (via `createHerdEvent`) call it for Sale / Death; the older `log_herd_event(...)`
+  RPC now covers only the goat-less Other addition / Other removal events.
 - `sales_purchases` — type (sale / purchase), optional goat, party, date, amount, notes.
 - `tasks` — title, due date, done flag, type (task / feeding / health check), optional goat.
 

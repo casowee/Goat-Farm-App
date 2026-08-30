@@ -331,6 +331,7 @@ export type Database = {
           dam_name: string | null
           date_of_birth: string
           id: number
+          is_temp_tag: boolean
           name: string | null
           notes: string | null
           origin: Database["public"]["Enums"]["goat_origin"]
@@ -353,6 +354,7 @@ export type Database = {
           dam_name?: string | null
           date_of_birth: string
           id?: number
+          is_temp_tag?: boolean
           name?: string | null
           notes?: string | null
           origin?: Database["public"]["Enums"]["goat_origin"]
@@ -375,6 +377,7 @@ export type Database = {
           dam_name?: string | null
           date_of_birth?: string
           id?: number
+          is_temp_tag?: boolean
           name?: string | null
           notes?: string | null
           origin?: Database["public"]["Enums"]["goat_origin"]
@@ -892,11 +895,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_goat_departure: {
+        Args: {
+          p_cause_category?: Database["public"]["Enums"]["health_record_type"]
+          p_cause_title?: string
+          p_date: string
+          p_goat_id: number
+          p_kind: string
+          p_note?: string
+        }
+        Returns: {
+          created_at: string
+          event_date: string
+          event_type: Database["public"]["Enums"]["herd_event_type"]
+          goat_id: number | null
+          id: number
+          note: string | null
+          owner_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "herd_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       goat_origin: "born_here" | "purchased"
       goat_sex: "male" | "female"
-      goat_status: "active" | "sold" | "deceased"
+      goat_status: "active" | "sold" | "deceased" | "stolen"
       health_record_status: "active" | "completed" | "cancelled"
       health_record_type:
         | "vaccination"
@@ -1044,7 +1072,7 @@ export const Constants = {
     Enums: {
       goat_origin: ["born_here", "purchased"],
       goat_sex: ["male", "female"],
-      goat_status: ["active", "sold", "deceased"],
+      goat_status: ["active", "sold", "deceased", "stolen"],
       health_record_status: ["active", "completed", "cancelled"],
       health_record_type: [
         "vaccination",

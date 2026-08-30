@@ -210,6 +210,15 @@ the normal case for vaccination/deworming/checkup and must still count).
   `/goats`") holds. If the owner would rather the dashboard count only `active` goats, that's a
   one-line `.eq("status", "active")` on the goat query plus the same filter in the weight/due-soon
   scoping — flagged here so it's a known, cheap change.
+  - **Amendment 2026-08-30 (via `UPD-008`, owner request after testing):** the owner confirmed a sold /
+    deceased / stolen goat is **not** part of the current herd, so `computeHerdComposition` in
+    `lib/dashboard/herd-composition.ts` now filters to `status = 'active'` internally before counting —
+    `total`, every per-stage count, the sex split and the buck-to-doe ratio are all active-only,
+    unconditionally (a correctness rule of the count, not a display filter). `HerdCompositionGoat`
+    gained a `status` field. The weight-growth and due-soon widgets still scope to the full
+    barn-filtered goat set (a sold goat's history is still valid data); only the composition counts
+    changed. The herd-population *timeline* (`computeHerdTimeline`, `UPD-006`) is event-driven and
+    unchanged. See `context/update-specs/008-*.md` §11.
 - **Barn-filter scoping** is done by fetching the (barn-filtered) goat id list once and scoping the
   `weights` and `health_records` queries with `.in("goat_id", ids)`, rather than a PostgREST embedded
   filter — simpler and unambiguous for a single-owner dataset.

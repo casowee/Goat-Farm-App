@@ -9,6 +9,7 @@ import {
   primaryBreed,
   validateComposition,
 } from "@/lib/goats/breeds";
+import { generateTempTag } from "@/lib/goats/temp-tag";
 
 type GoatSex = Database["public"]["Enums"]["goat_sex"];
 type GoatStatus = Database["public"]["Enums"]["goat_status"];
@@ -16,7 +17,7 @@ type ReproductiveState = Database["public"]["Enums"]["reproductive_state"];
 type GoatOrigin = Database["public"]["Enums"]["goat_origin"];
 
 const GOAT_SEXES: GoatSex[] = ["male", "female"];
-const GOAT_STATUSES: GoatStatus[] = ["active", "sold", "deceased"];
+const GOAT_STATUSES: GoatStatus[] = ["active", "sold", "deceased", "stolen"];
 const REPRODUCTIVE_STATES: ReproductiveState[] = ["intact", "castrated"];
 const GOAT_ORIGINS: GoatOrigin[] = ["born_here", "purchased"];
 
@@ -235,6 +236,11 @@ export async function createGoat(
     return parsed.error;
   }
 
+  // UPD-010 — the "Add newborn kid" flow. The tag typed by the form is only a
+  // preview; the server regenerates the `{dam_tag}-K{n}` value against the live
+  // tag list here so it is the authority, and marks the row `is_temp_tag`.
+  const isTempTag = formData.get("is_temp_tag") === "true";
+
   const supabase = await createClient();
 
   const { data: barn } = await supabase
@@ -257,11 +263,39 @@ export async function createGoat(
     return parentError;
   }
 
+  let insertFields: typeof parsed.fields & { is_temp_tag?: boolean } = {
+    ...parsed.fields,
+  };
+
+  if (isTempTag) {
+    if (parsed.fields.dam_id == null) {
+      return "A newborn kid needs its dam. Please try again.";
+    }
+    const { data: dam } = await supabase
+      .from("goats")
+      .select("tag")
+      .eq("id", parsed.fields.dam_id)
+      .maybeSingle();
+    if (!dam) {
+      return "Could not find the dam for this kid.";
+    }
+    const { data: tagRows } = await supabase.from("goats").select("tag");
+    insertFields = {
+      ...insertFields,
+      tag: generateTempTag(
+        dam.tag,
+        (tagRows ?? []).map((row) => row.tag),
+      ),
+      origin: "born_here",
+      is_temp_tag: true,
+    };
+  }
+
   // owner_id is not set here: the column default (auth.uid()) stamps it,
   // and RLS scopes every later read/update/delete to that owner.
   const { data: created, error } = await supabase
     .from("goats")
-    .insert(parsed.fields)
+    .insert(insertFields)
     .select("id")
     .single();
 
@@ -279,6 +313,12 @@ export async function createGoat(
   }
 
   revalidatePath("/goats");
+  // UPD-010 — a newborn kid is added from its dam's detail page: refresh it so
+  // the "Total kids" count and the next auto-generated temp-tag preview are
+  // up to date for a second kid added right after.
+  for (const parentId of [parsed.fields.dam_id, parsed.fields.sire_id]) {
+    if (parentId != null) revalidatePath(`/goats/${parentId}`);
+  }
 }
 
 // Replace a goat's breed-composition rows. Two-step (delete + insert), not
@@ -341,9 +381,20 @@ export async function updateGoat(
     return parentError;
   }
 
+  // UPD-010 — promotion is one-way. The edit form only sends `is_temp_tag` for a
+  // goat that currently has a temp tag: "false" promotes it permanently (with a
+  // real tag entered in the same save); "true" leaves it unchanged. An update
+  // never sets `is_temp_tag` back to true, so re-enabling it isn't a UI flow.
+  const updateFields: typeof parsed.fields & { is_temp_tag?: boolean } = {
+    ...parsed.fields,
+  };
+  if (formData.get("is_temp_tag") === "false") {
+    updateFields.is_temp_tag = false;
+  }
+
   const { error } = await supabase
     .from("goats")
-    .update(parsed.fields)
+    .update(updateFields)
     .eq("id", id);
 
   if (!error) {

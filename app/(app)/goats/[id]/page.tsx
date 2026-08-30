@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, PawPrint } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { GoatFormDialog } from "@/components/goats/goat-form-dialog";
-import { DeleteGoatDialog } from "@/components/goats/delete-goat-dialog";
+import { RemoveGoatDialog } from "@/components/goats/remove-goat-dialog";
 import { GoatStageBadge } from "@/components/goats/goat-stage-badge";
+import { TempTagBadge } from "@/components/goats/temp-tag-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,10 +45,18 @@ function formatAge(dateOfBirth: string): string {
 
 export default async function GoatDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
+  const { from } = await searchParams;
+  // UPD-008 — when the owner opened this profile from the "possible duplicates"
+  // view, send them back there (not to the full list) from both the "Back to
+  // Goats" button and after a removal.
+  const backHref = from === "duplicates" ? "/goats?view=duplicates" : "/goats";
+  const backLabel = from === "duplicates" ? "Back to duplicates" : "Back to Goats";
   const goatId = Number(id);
 
   if (!Number.isInteger(goatId)) {
@@ -79,9 +88,20 @@ export default async function GoatDetailPage({
   const { data: allGoats } = await supabase
     .from("goats")
     .select(
-      "id, tag, name, sex, sire_id, dam_id, sire_name, dam_name, breed_composition:goat_breed_composition(breed, pct)",
+      "id, tag, name, sex, status, is_temp_tag, sire_id, dam_id, sire_name, dam_name, breed_composition:goat_breed_composition(breed, pct)",
     )
     .order("tag");
+
+  // UPD-010 — lifetime "Total kids" for a doe: every kid ever linked to her via
+  // dam_id, regardless of tag status (temp / promoted) or life status
+  // (active / sold / deceased / stolen). A direct RLS-scoped count — no herd fetch.
+  const { count: totalKids } =
+    goat.sex === "female"
+      ? await supabase
+          .from("goats")
+          .select("id", { count: "exact", head: true })
+          .eq("dam_id", goatId)
+      : { count: null };
 
   const goatsById = new Map<number, PedigreeGoatRow>(
     (allGoats ?? []).map((g) => [g.id, g]),
@@ -112,6 +132,8 @@ export default async function GoatDetailPage({
     tag: g.tag,
     name: g.name,
     sex: g.sex,
+    status: g.status,
+    is_temp_tag: g.is_temp_tag,
     composition: g.breed_composition ?? [],
   }));
 
@@ -123,10 +145,10 @@ export default async function GoatDetailPage({
         variant="ghost"
         size="sm"
         nativeButton={false}
-        render={<Link href="/goats" />}
+        render={<Link href={backHref} />}
       >
         <ArrowLeft />
-        Back to Goats
+        {backLabel}
       </Button>
 
       <Card>
@@ -136,7 +158,10 @@ export default async function GoatDetailPage({
               <PawPrint className="h-8 w-8" />
             </div>
             <div className="flex flex-col gap-1">
-              <CardTitle className="text-lg">{label}</CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-lg">{label}</CardTitle>
+                {goat.is_temp_tag && <TempTagBadge />}
+              </div>
               <p className="text-sm text-copy-muted">
                 {goat.name ? `Tag ${goat.tag}` : "No name on file"}
               </p>
@@ -152,21 +177,48 @@ export default async function GoatDetailPage({
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <GoatFormDialog
-              goat={goat}
-              breedComposition={goat.breed_composition ?? []}
-              barns={barns ?? []}
-              goats={parentGoats}
-              triggerLabel="Edit"
-              triggerVariant="outline"
-            />
-            <MoveBarnDialog
-              goatId={goat.id}
-              currentBarnId={goat.barn_id}
-              barns={barns ?? []}
-            />
-            <DeleteGoatDialog goatId={goat.id} goatLabel={label} />
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
+              <GoatFormDialog
+                goat={goat}
+                breedComposition={goat.breed_composition ?? []}
+                barns={barns ?? []}
+                goats={parentGoats}
+                triggerLabel="Edit"
+                triggerVariant="outline"
+              />
+              {goat.sex === "female" && (
+                <GoatFormDialog
+                  newbornDam={{ id: goat.id, tag: goat.tag }}
+                  breedComposition={[]}
+                  barns={barns ?? []}
+                  goats={parentGoats}
+                  triggerLabel="Add newborn kid"
+                  triggerIcon
+                  triggerVariant="outline"
+                />
+              )}
+              <MoveBarnDialog
+                goatId={goat.id}
+                currentBarnId={goat.barn_id}
+                barns={barns ?? []}
+              />
+              <RemoveGoatDialog
+                goatId={goat.id}
+                goatLabel={label}
+                causePresets={healthPresets}
+                returnTo={backHref}
+              />
+            </div>
+            {goat.sex === "female" && (
+              <p className="text-xs text-copy-muted">
+                Total kids:{" "}
+                <span className="text-copy-secondary">{totalKids ?? 0}</span>{" "}
+                <span className="text-copy-muted">
+                  (every kid ever born to her)
+                </span>
+              </p>
+            )}
           </div>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

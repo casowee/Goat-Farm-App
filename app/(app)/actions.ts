@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.types";
+import { recordGoatDeparture } from "@/app/(app)/goats/departure";
 
 export type HerdEvent = Database["public"]["Tables"]["herd_events"]["Row"];
 type HerdEventType = Database["public"]["Enums"]["herd_event_type"];
@@ -31,11 +32,14 @@ function isIsoDate(value: string): boolean {
 }
 
 /**
- * UPD-006 (6b) — log a herd event. For a Sale or Death that names a goat, the
- * `log_herd_event` RPC also flips that goat's status to `sold` / `deceased` in
- * the same call, so the event log and the goat's status can never drift apart
- * (Section 8). Birth and purchase are never logged here — the timeline derives
- * those from the goat records.
+ * UPD-006 (6b) — log a herd event. Birth and purchase are never logged here —
+ * the timeline derives those from the goat records.
+ *
+ * UPD-008 (8c) refactor: Sale / Death now go through the shared
+ * `recordGoatDeparture` helper (the `record_goat_departure` RPC), the same path
+ * the reason-based removal dialog uses, so the goat-status + `herd_events`
+ * side effect lives in exactly one place. Goat-less "Other addition" /
+ * "Other removal" still use the `log_herd_event` RPC.
  */
 export async function createHerdEvent(
   formData: FormData,
@@ -72,6 +76,12 @@ export async function createHerdEvent(
   }
 
   const note = String(formData.get("note") ?? "").trim() || null;
+
+  // Sale / Death → the shared departure path (status + herd_events, atomic).
+  // Both require a goat (checked above), so `goatId` is non-null here.
+  if ((typeRaw === "sale" || typeRaw === "death") && goatId !== null) {
+    return recordGoatDeparture(goatId, typeRaw, dateRaw, note ?? undefined);
+  }
 
   const supabase = await createClient();
 
