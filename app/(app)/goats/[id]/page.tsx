@@ -29,6 +29,10 @@ import { WeightFormDialog } from "@/components/weight/weight-form-dialog";
 import { WeightGrowthChart } from "@/components/weight/weight-growth-chart";
 import { WeightHistoryList } from "@/components/weight/weight-history-list";
 import { listWeightsByGoat } from "@/app/(app)/weight/actions";
+import {
+  GoatBreedingTab,
+  loadGoatBreedingTabData,
+} from "@/components/goats/goat-breeding-tab";
 
 function formatAge(dateOfBirth: string): string {
   const months = ageInMonths(dateOfBirth);
@@ -126,6 +130,21 @@ export default async function GoatDetailPage({
   const healthPresets = await listHealthConditionPresets();
   const medicines = await listMedicineItems();
   const weights = await listWeightsByGoat(goatId);
+
+  // UPD-012 / Feature 09 integration — real content for the Breeding tab,
+  // assembled from the Breeding page's and Doe Performance tab's own pieces.
+  const breedingTabData = await loadGoatBreedingTabData(
+    {
+      id: goat.id,
+      sex: goat.sex,
+      reproductive_state: goat.reproductive_state,
+      date_of_birth: goat.date_of_birth,
+      status: goat.status,
+      tag: goat.tag,
+      name: goat.name,
+    },
+    healthRecords,
+  );
 
   const parentGoats = (allGoats ?? []).map((g) => ({
     id: g.id,
@@ -334,7 +353,7 @@ export default async function GoatDetailPage({
           </Card>
         </TabsContent>
         <TabsContent value="breeding">
-          <ComingSoon label="Breeding history" />
+          <GoatBreedingTab data={breedingTabData} />
         </TabsContent>
         <TabsContent value="lineage">
           <Card>
@@ -354,17 +373,5 @@ export default async function GoatDetailPage({
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm text-copy-muted">
-          {label} — coming soon
-        </CardTitle>
-      </CardHeader>
-    </Card>
   );
 }

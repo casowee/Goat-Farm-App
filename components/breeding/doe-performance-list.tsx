@@ -20,35 +20,9 @@ import {
   DOE_PERFORMANCE_FLAG_LABELS,
   type DoePerformanceFlag,
 } from "@/lib/breeding/doe-performance";
+import type { DoePerformanceRow } from "@/lib/breeding/doe-performance-row";
 
-export interface DoePerformanceRow {
-  doeId: number;
-  doeLabel: string;
-  tag: string;
-  name: string | null;
-  ageMonths: number;
-  ageLabel: string;
-  flags: DoePerformanceFlag[];
-  lastKiddingLabel: string | null;
-  monthsSinceLastKidding: number | null;
-  lastKiddingAgoLabel: string | null;
-  averageIntervalMonths: number | null;
-  averageIntervalLabel: string | null;
-  kiddingEvents: { dateLabel: string; kidCount: number }[];
-  healthRecords: {
-    id: number;
-    typeLabel: string;
-    title: string;
-    dateLabel: string;
-    status: string;
-  }[];
-  notes: {
-    id: number;
-    categoryLabel: string;
-    note: string | null;
-    createdAtLabel: string;
-  }[];
-}
+export type { DoePerformanceRow } from "@/lib/breeding/doe-performance-row";
 
 const CATEGORY_ITEMS = DOE_PERFORMANCE_CATEGORIES.map((value) => ({
   value,
@@ -149,8 +123,14 @@ function NoteForm({ doeId }: { doeId: number }) {
   );
 }
 
-function DoeCard({ row }: { row: DoePerformanceRow }) {
-  const [open, setOpen] = useState(false);
+export function DoeCard({
+  row,
+  defaultOpen = false,
+}: {
+  row: DoePerformanceRow;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-surface-border p-4">
@@ -164,14 +144,20 @@ function DoeCard({ row }: { row: DoePerformanceRow }) {
             <span className="text-sm font-medium text-copy-primary">
               {row.doeLabel}
             </span>
-            {row.flags.map((flag) => (
-              <span
-                key={flag}
-                className="rounded-lg bg-warning/15 px-2 py-0.5 text-xs text-warning"
-              >
-                {DOE_PERFORMANCE_FLAG_LABELS[flag]}
+            {row.flags.length > 0 ? (
+              row.flags.map((flag) => (
+                <span
+                  key={flag}
+                  className="rounded-lg bg-warning/15 px-2 py-0.5 text-xs text-warning"
+                >
+                  {DOE_PERFORMANCE_FLAG_LABELS[flag]}
+                </span>
+              ))
+            ) : (
+              <span className="rounded-lg bg-subtle px-2 py-0.5 text-xs text-success">
+                Not currently flagged
               </span>
-            ))}
+            )}
           </div>
           <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-copy-muted">
             <div className="flex gap-1">

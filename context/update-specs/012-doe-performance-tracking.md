@@ -4,7 +4,7 @@
 | ----------------- | ------------------------------------------------------------------ |
 | ID                | `UPD-012`                                                          |
 | Title             | Flag underperforming does (overdue, long interval, never-kidded) + owner-recorded investigation notes |
-| Status            | `done` — built 2026-09-05, owner-tested in the running app and confirmed working 2026-09-05 (migrations `20260905000005` + `20260905000006` applied) |
+| Status            | `done` — core feature built + owner-tested 2026-09-05; goat-profile Breeding tab integration added and owner-confirmed working 2026-09-05 (migrations `20260905000005` + `20260905000006` applied) |
 | Owner approved?   | yes                                                              |
 | Feature spec(s)   | `05-goat-profiles`, `06-family-tree` (dam linkage), `07-health-records` (correlation view) |
 | Depends on        | `05`, `06` (done); `07` (health records, reused for context — does not require `07` to be formally "done," just its table to exist). **Does NOT depend on `09`** — this reads only already-shipped goat/lineage data. |
@@ -279,6 +279,32 @@ has any recorded.
 `npm run build` + `npx tsc --noEmit` clean after the amendment; `npm run lint` still at project
 baseline (no new issues).
 
+### Amendment 2 — 2026-09-05 (goat-profile Breeding tab integration, shared with Feature `09`)
+
+The goat detail page's **Breeding tab** — a "coming soon" placeholder left from spec `05` — is now wired
+to real data, differing by the goat's sex, **assembling already-built pieces from `09` and `012`, no new
+domain logic**:
+
+- **Doe:** her kidding performance, via `computeDoePerformance` + a new shared mapper
+  `toDoePerformanceRow` (extracted from `/breeding/doe-performance/page.tsx` into
+  `lib/breeding/doe-performance-row.ts` along with the `DoePerformanceRow` type + `RECENT_HEALTH_LIMIT`),
+  rendered with the **same `DoeCard`** the Doe Performance tab uses (now exported, with a `defaultOpen`
+  prop and a "Not currently flagged" affordance for the `flags: []` case). The card's own note form
+  saves to `doe_performance_notes` exactly as on the tab — `addDoePerformanceNote` now also
+  `revalidatePath('/goats/<id>')`. A too-young doe (`computeDoePerformance` → `null`) shows a plain
+  non-alarming "nothing to show yet" note, never a false "never kidded" flag.
+- **Buck:** his season history via `SeasonSummaryCard` — the Breeding page's per-season card markup,
+  extracted into `components/breeding/season-summary-card.tsx` and now used by both the Breeding page
+  (with edit/delete passed through a new `actions` slot) and here (read-only).
+- **Wether:** "Not applicable". **Young buck with no season:** "not assigned to a season yet".
+- New `components/goats/goat-breeding-tab.tsx` = `loadGoatBreedingTabData()` (fetch + compute at the
+  goat page's top level, matching the other tabs) + a synchronous `GoatBreedingTab` renderer.
+
+`npm run build` + `npx tsc --noEmit` clean; `npm run lint` at project baseline. Pure `toDoePerformanceRow`
+re-checked (durations all `formatAge`-formatted, health/notes mapped, too-young → `null`). Owner
+confirmed the goat-profile Breeding tab working 2026-09-05 — `UPD-012` is `done`. (Feature `09` stays
+`in progress` on its own separate pending checklist, unrelated to this integration.)
+
 ## 12. Verification evidence
 
 **Automatic (agent):**
@@ -314,9 +340,13 @@ policy shape and no novel access pattern.
 
 ## 13. Resolution / final state
 
-`UPD-012` is **`done`**. Doe reproductive performance tracking ships as a **tab inside the Breeding
-page** (`/breeding` "Seasons" · `/breeding/doe-performance` "Doe Performance", route-backed strip in
-`components/breeding/breeding-tabs.tsx`) — no top-level nav entry.
+`UPD-012` is **`done`** — core feature built and owner-tested 2026-09-05, and the goat-profile
+Breeding-tab integration (Amendment 2) confirmed working by the owner the same day.
+
+Doe reproductive performance tracking ships as a **tab inside the Breeding page** (`/breeding` "Seasons"
+· `/breeding/doe-performance` "Doe Performance", route-backed strip in
+`components/breeding/breeding-tabs.tsx`) — no top-level nav entry — plus a **Breeding tab on each goat's
+detail page** (buck season history / doe kidding performance).
 
 - **Schema:** two additive tables — `doe_performance_settings` (one row per owner; `max_expected_interval_months`
   default 13, `breeding_eligible_age_months` default **12**) and `doe_performance_notes`

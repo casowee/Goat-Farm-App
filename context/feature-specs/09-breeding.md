@@ -492,3 +492,28 @@ of `feature-specs-roadmap.md`, and update `progress-tracker.md` — note this is
 - **Real push notifications.** ✅ **Noted as possible future work, not built.** The reminder stays in-app
   only (the Due soon widget). A real OS-level push (service worker + push subscription) would be its own
   larger update, revisited only if in-app reminders prove insufficient in practice.
+
+## 14. Implementation notes
+
+### 2026-09-05 — goat-profile Breeding tab wired up (shared with `UPD-012`)
+
+The goat detail page's **Breeding tab** (a "coming soon" placeholder left from spec `05`) now shows real
+content, differing by sex:
+
+- **Buck:** his past and current breeding seasons, read from `breeding_season_bucks` /
+  `breeding_season_occurrences`, rendered with the **same** `SeasonSummaryCard` the Breeding page's own
+  season list uses. That per-season card markup was **extracted** out of `app/(app)/breeding/page.tsx`
+  into `components/breeding/season-summary-card.tsx` (`SeasonSummaryCard` + `SeasonSummary` type +
+  `seasonBuckLabel`); the Breeding page now renders it too, passing its edit/delete dialogs through the
+  new `actions` slot — one rendering, not two. Kidding-window / suggested-buck-out / heading logic moved
+  into the component unchanged.
+- **Wether:** a plain "Not applicable" note.
+- **Buckling / young buck with no season yet:** a non-alarming "hasn't been assigned to a season yet".
+
+`components/goats/goat-breeding-tab.tsx` holds `loadGoatBreedingTabData()` (fetch + compute, called at
+the goat page's top level like every other tab's data) and the synchronous `GoatBreedingTab` renderer.
+No new breeding domain logic — it assembles existing pieces.
+
+The goat-profile Breeding tab itself was **owner-confirmed working 2026-09-05** (and `UPD-012` closed on
+that basis). `09` remains **not `done`** for its own separate reason — the full breeding-seasons feature
+still awaits the owner's hands-on test of the §11 checklist and the cross-account RLS check.

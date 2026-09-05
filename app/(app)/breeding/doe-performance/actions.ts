@@ -112,4 +112,6 @@ export async function addDoePerformanceNote(
   }
 
   revalidatePath("/breeding/doe-performance");
+  // The doe's own Breeding tab on her detail page shows the same notes.
+  revalidatePath(`/goats/${doeId}`);
 }

@@ -15,9 +15,9 @@ import { DeleteSeasonDialog } from "@/components/breeding/delete-season-dialog";
 import { ApproveSeasonButton } from "@/components/breeding/approve-season-button";
 import { SeasonTimeline } from "@/components/breeding/season-timeline";
 import { BuckCapacityStat } from "@/components/breeding/buck-capacity-stat";
+import { SeasonSummaryCard } from "@/components/breeding/season-summary-card";
 import { computeHerdComposition } from "@/lib/dashboard/herd-composition";
 import { computeBuckCapacity } from "@/lib/breeding/capacity";
-import { computeKiddingWindow } from "@/lib/breeding/kidding-window";
 import { computeSeasonalTimeline } from "@/lib/breeding/timeline";
 import { computeBreedingReminders } from "@/lib/breeding/reminders";
 import {
@@ -28,7 +28,7 @@ import {
   DEFAULT_BREEDING_SETTINGS,
   type BreedingSettings,
 } from "@/lib/breeding/settings";
-import { addMonths, parseDateOnly } from "@/lib/breeding/season";
+import { parseDateOnly } from "@/lib/breeding/season";
 import {
   relevantTemplateId,
   type SeasonTemplate,
@@ -50,16 +50,6 @@ function formatDate(value: string | null): string {
     month: "short",
     year: "numeric",
   });
-}
-
-function formatWindow(start: Date, end: Date | null): string {
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  return end ? `${fmt(start)} – ${fmt(end)}` : `from ${fmt(start)} (open-ended)`;
 }
 
 function maleLabel(male: EligibleMale): string {
@@ -276,11 +266,6 @@ export default async function BreedingPage() {
               </p>
             ) : (
               occurrences.map((occ) => {
-                const start = parseDateOnly(occ.start_date);
-                const end = parseDateOnly(occ.end_date);
-                const window = start
-                  ? computeKiddingWindow(start, end, settings.gestation_days)
-                  : null;
                 const linkedBucks = seasonBucks.get(occ.id) ?? [];
                 const bucksLabel =
                   linkedBucks.length > 0
@@ -290,43 +275,28 @@ export default async function BreedingPage() {
                   occ.season_template_id != null
                     ? templateById.get(occ.season_template_id)
                     : undefined;
-                const heading = template
-                  ? `${template.label}${start ? ` — ${start.getFullYear()}` : ""}`
-                  : bucksLabel;
-                const suggestedBuckOut =
-                  occ.end_date === null && template && start
-                    ? formatDate(toIso(addMonths(start, template.length_months)))
-                    : null;
                 const barnName = occ.barn_id
                   ? ((barns ?? []).find((b) => b.id === occ.barn_id)?.name ??
                     null)
                   : null;
 
                 return (
-                  <div
+                  <SeasonSummaryCard
                     key={occ.id}
-                    className="flex flex-col gap-2 rounded-xl border border-surface-border p-3"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-copy-primary">
-                          {heading}
-                          {occ.end_date === null && (
-                            <span className="ml-2 rounded-lg bg-accent-dim px-2 py-0.5 text-xs text-brand">
-                              Bucks in
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-copy-muted">
-                          {template ? `${bucksLabel} · ` : ""}
-                          {formatDate(occ.start_date)} →{" "}
-                          {occ.end_date
-                            ? formatDate(occ.end_date)
-                            : "still with the herd"}
-                          {barnName ? ` · ${barnName}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-2">
+                    season={{
+                      id: occ.id,
+                      start_date: occ.start_date,
+                      end_date: occ.end_date,
+                      note: occ.note,
+                      season_template_id: occ.season_template_id,
+                      barn_id: occ.barn_id,
+                    }}
+                    bucks={linkedBucks}
+                    template={template}
+                    barnName={barnName}
+                    gestationDays={settings.gestation_days}
+                    actions={
+                      <>
                         <SeasonFormDialog
                           bucks={bucks}
                           bucklings={bucklings}
@@ -350,29 +320,9 @@ export default async function BreedingPage() {
                           seasonId={occ.id}
                           bucksLabel={bucksLabel}
                         />
-                      </div>
-                    </div>
-                    {window && (
-                      <p className="text-xs text-copy-secondary">
-                        Kidding expected:{" "}
-                        <span className="text-copy-primary">
-                          {formatWindow(window.start, window.end)}
-                        </span>
-                      </p>
-                    )}
-                    {suggestedBuckOut && (
-                      <p className="text-xs text-copy-muted">
-                        Suggested buck-out:{" "}
-                        <span className="text-copy-secondary">
-                          {suggestedBuckOut}
-                        </span>{" "}
-                        (add the real date when they come out)
-                      </p>
-                    )}
-                    {occ.note && (
-                      <p className="text-xs text-copy-muted">{occ.note}</p>
-                    )}
-                  </div>
+                      </>
+                    }
+                  />
                 );
               })
             )}

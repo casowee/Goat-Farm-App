@@ -4,36 +4,19 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { BreedingTabs } from "@/components/breeding/breeding-tabs";
 import { listHealthRecordsByGoat } from "@/app/(app)/health/actions";
-import {
-  DoePerformanceList,
-  type DoePerformanceRow,
-} from "@/components/breeding/doe-performance-list";
+import { DoePerformanceList } from "@/components/breeding/doe-performance-list";
 import {
   computeDoePerformance,
   DEFAULT_DOE_PERFORMANCE_SETTINGS,
-  DOE_PERFORMANCE_CATEGORY_LABELS,
   type DoePerformance,
   type DoePerformanceGoat,
   type DoePerformanceSettings,
 } from "@/lib/breeding/doe-performance";
-import { formatAge } from "@/lib/goats/age";
 import {
-  HEALTH_RECORD_TYPE_LABELS,
-  type HealthRecordType,
-} from "@/lib/health/records";
-
-// How many of a doe's most recent health records to show for context.
-const RECENT_HEALTH_LIMIT = 5;
-
-function formatDate(value: Date | string): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+  toDoePerformanceRow,
+  type DoePerformanceNoteInput,
+  type DoePerformanceRow,
+} from "@/lib/breeding/doe-performance-row";
 
 export default async function DoePerformancePage() {
   const supabase = await createClient();
@@ -75,18 +58,10 @@ export default async function DoePerformancePage() {
 
   const goatById = new Map(allGoats.map((g) => [g.id, g]));
 
-  const notesByDoe = new Map<
-    number,
-    { id: number; categoryLabel: string; note: string | null; createdAtLabel: string }[]
-  >();
+  const notesByDoe = new Map<number, DoePerformanceNoteInput[]>();
   for (const n of noteRows ?? []) {
     const list = notesByDoe.get(n.doe_id) ?? [];
-    list.push({
-      id: n.id,
-      categoryLabel: DOE_PERFORMANCE_CATEGORY_LABELS[n.category],
-      note: n.note,
-      createdAtLabel: formatDate(n.created_at),
-    });
+    list.push(n);
     notesByDoe.set(n.doe_id, list);
   }
 
@@ -95,43 +70,12 @@ export default async function DoePerformancePage() {
       // Reuse feature 07's own query — no duplicated health-record logic.
       const health = await listHealthRecordsByGoat(p.doeId);
       const goat = goatById.get(p.doeId);
-      return {
-        doeId: p.doeId,
-        doeLabel: p.doeLabel,
-        tag: goat?.tag ?? p.doeLabel,
-        name: goat?.name ?? null,
-        ageMonths: p.ageMonths,
-        ageLabel: formatAge(p.ageMonths),
-        flags: p.flags,
-        lastKiddingLabel:
-          p.kiddingEvents.length > 0
-            ? formatDate(p.kiddingEvents[p.kiddingEvents.length - 1].date)
-            : null,
-        monthsSinceLastKidding: p.monthsSinceLastKidding,
-        lastKiddingAgoLabel:
-          p.monthsSinceLastKidding !== null
-            ? formatAge(p.monthsSinceLastKidding)
-            : null,
-        averageIntervalMonths: p.averageIntervalMonths,
-        averageIntervalLabel:
-          p.averageIntervalMonths !== null
-            ? formatAge(p.averageIntervalMonths)
-            : null,
-        kiddingEvents: p.kiddingEvents.map((e) => ({
-          dateLabel: formatDate(e.date),
-          kidCount: e.kidCount,
-        })),
-        healthRecords: health.slice(0, RECENT_HEALTH_LIMIT).map((h) => ({
-          id: h.id,
-          typeLabel:
-            HEALTH_RECORD_TYPE_LABELS[h.record_type as HealthRecordType] ??
-            h.record_type,
-          title: h.title,
-          dateLabel: formatDate(h.date_occurred),
-          status: h.status,
-        })),
-        notes: notesByDoe.get(p.doeId) ?? [],
-      };
+      return toDoePerformanceRow(
+        p,
+        { tag: goat?.tag ?? p.doeLabel, name: goat?.name ?? null },
+        notesByDoe.get(p.doeId) ?? [],
+        health,
+      );
     }),
   );
 

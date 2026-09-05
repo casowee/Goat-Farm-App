@@ -392,8 +392,10 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > applied as zero-risk hardening rather than a confirmed-bug fix. Full detail in the spec's own dated
 > Amendment and `progress-tracker.md`.
 
-> 🐐 **`UPD-012` (Doe Reproductive Performance Tracking) — `done`, built + owner-tested in the running
-> app 2026-09-05.** `context/update-specs/012-doe-performance-tracking.md`. Reads only
+> 🐐 **`UPD-012` (Doe Reproductive Performance Tracking) — `done`, built + owner-tested 2026-09-05,
+> including the goat-profile Breeding tab integration (owner-confirmed the same day).**
+> `context/update-specs/012-doe-performance-tracking.md`.
+> Reads only
 > already-shipped goat / lineage data (05, 06 `dam_id`) + health records (07, read-only) — **does not
 > depend on `09`**. Flags currently-active does that are underperforming: overdue since their last
 > kidding, a long historical average interval, or past breeding-eligible age with zero kiddings (a doe
@@ -417,6 +419,17 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > kidding-event grouping window; eligible-age default first 10, **amended same day to 12** ("a doeling
 > can have kids once she is older than a year") — the check was already raw-age-based, no stage bug.
 > `npm run build` + `tsc` clean; lint at project baseline.
+>
+> **Amendment 2 (2026-09-05) — goat-profile Breeding tab (integration with `09`).** The goat detail
+> page's Breeding tab (a spec-05 "coming soon" placeholder) now shows real content by sex, assembling
+> existing pieces: a **doe** → her kidding performance via the same `DoeCard` the Doe Performance tab
+> uses (now exported; shared mapper `toDoePerformanceRow` extracted to `lib/breeding/doe-performance-row.ts`);
+> a **buck** → his season history via `SeasonSummaryCard` (the Breeding page's per-season card markup
+> extracted to `components/breeding/season-summary-card.tsx`, now used by both, breeding page passes
+> edit/delete through an `actions` slot); a **wether** → "Not applicable"; a **young/too-young goat** →
+> a non-alarming empty state. New `components/goats/goat-breeding-tab.tsx`. Owner-confirmed working
+> 2026-09-05 → `UPD-012` `done`; `09` stays `in progress` on its own separate breeding-seasons test.
+> Build + tsc clean, lint at baseline.
 
 **Task 1 result (2026-08-29):** confirmed from the generated types that spec 07 built health records as
 **one `health_records` table with a `record_type` enum + a `next_due_date` column** — not the separate
