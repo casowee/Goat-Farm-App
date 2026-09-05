@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { TopBarSlot } from "@/components/top-bar";
 import { BarnFilter } from "@/components/dashboard/barn-filter";
 import { DashboardCsvButton } from "@/components/dashboard/dashboard-csv-button";
-import { SummaryStats } from "@/components/dashboard/summary-stats";
 import { DonutChartSkeleton, LineChartSkeleton } from "@/components/dashboard/chart-skeleton";
 import { CompositionDonutLazy } from "@/components/dashboard/composition-donut-lazy";
 import { WeightTrendChartLazy } from "@/components/dashboard/weight-trend-chart-lazy";
@@ -168,8 +167,6 @@ export default async function DashboardPage({
           herdSizeNow={herdSizeNow}
         />
       </TopBarSlot>
-
-      <SummaryStats composition={composition} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/*

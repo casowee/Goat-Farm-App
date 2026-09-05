@@ -347,13 +347,23 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > session. No service worker built (deliberately out of scope). **Still needs the owner's own hands-on
 > test** (real iPhone re-install) before this closes — see `progress-tracker.md`.
 >
-> **Refinement round (2026-09-05, owner tested the first build on a real iPhone, folded in while still
+> **Refinement round 1 (2026-09-05, owner tested the first build on a real iPhone, folded in while still
 > `in progress`):** dashboard card order changed to Herd composition → Sex ratio → Newborn Kids → Weight
 > growth → Due soon → Stock levels; the Newborn Kids widget reverted from 11b's vertical list to a
 > compact Recharts column chart (144px-tall, abbreviated month labels); every dashboard card's horizontal
 > padding tightened 16px → 12px. Full detail + the verification-method caveat (no physical iPhone/browser
 > available to confirm the 12-month no-scroll claim directly) in the spec's own dated Amendment and
 > `progress-tracker.md`.
+>
+> **Refinement round 2 (2026-09-05, from the live post-round-1 dashboard, folded in while still
+> `in progress`):** the summary-stats row (8 tiles) is **deleted** — `components/dashboard/
+> summary-stats.tsx` removed entirely, its numbers already duplicated in the donuts below it (the one
+> figure lost is the row's own Doelings+Bucklings "Young stock" rollup, flagged for the owner per their
+> own request to confirm that's fine). Both donuts (`composition-donut.tsx`) now show every slice's count
+> always visible via a custom Recharts label (inside the arc for slices ≥12% of the total, outside with a
+> leader line for thinner ones) — no click/hover/tap needed. Donuts grew from 176px to 256px to fill the
+> freed space. Full detail + the verification caveat (still no physical iPhone/browser available in this
+> environment) in the spec's own dated Amendment and `progress-tracker.md`.
 
 **Task 1 result (2026-08-29):** confirmed from the generated types that spec 07 built health records as
 **one `health_records` table with a `record_type` enum + a `next_due_date` column** — not the separate

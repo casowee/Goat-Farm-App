@@ -185,6 +185,52 @@ arithmetic + Recharts' band-scale rendering guarantee described above, rather th
 owner's own hands-on iPhone check (Section 11) still stands as the real confirmation, same as the rest of
 this spec.
 
+### Amendment — 2026-09-05 (owner request, second refinement round from the live dashboard, folded in while still `in progress`)
+
+Looking at the live (post-amendment-1) dashboard, the owner asked for a further pass, still targeting
+phone-width legibility:
+
+1. **Removed the summary-stats row entirely.** The 8-tile row (Total goats, Does, Bucks, Young stock,
+   Kids, Wethers, Female, Male) above the cards was the single largest consumer of vertical space and
+   duplicated numbers already shown in the Herd composition and Sex ratio donuts below it. `components/
+   dashboard/summary-stats.tsx` is deleted (not just unrendered — nothing else imported it) and its
+   `<SummaryStats>` call site removed from `app/(app)/page.tsx`. **Net effect on information:** every
+   individual figure survives in the donuts (`Doelings=7` and `Bucklings=8` are still separate donut
+   slices) — the one number that doesn't survive anywhere is the row's own `Young stock` tile, a
+   Doelings+Bucklings **rollup** that had no other home. The owner's request explicitly asked to confirm
+   this is fine rather than silently drop it: flagged here and in `progress-tracker.md`: if a combined
+   young-stock figure is wanted again later, the cheapest place to add it back is a small caption line
+   under the Herd composition donut, not a new full row.
+2. **Always-visible slice labels on both donuts.** `components/dashboard/composition-donut.tsx` now passes
+   a custom `label` render function to Recharts' `Pie` (`labelLine={false}`, since the function draws its
+   own connector) instead of relying on the Tooltip: slices at or above 12% of the total render their
+   count centred inside the arc; thinner slices (the spec's own examples, Bucks/Wethers) render the count
+   just outside the ring with a short leader line — the standard readable pattern for pie/donut segments
+   too thin to hold inside text, using the well-known Recharts trig recipe (`cx/cy + radius *
+   cos/sin(-midAngle * RADIAN)`) for both the inside position and the outside label + leader-line path.
+   Text color is `var(--bg-base)` for inside labels (dark-on-light-accent, tokens only, no hardcoded hex)
+   and `var(--text-secondary)` for outside labels. The center total ("102 GOATS" style) and the legend
+   below the chart are both unchanged, per the spec's own instructions to keep them.
+3. **Donuts resized larger.** With the summary row gone, `CompositionDonut`'s container grew from `h-44`
+   (176px) to `h-64` (256px), `innerRadius`/`outerRadius` changed from `62%`/`92%` to `52%`/`72%` (pulled
+   in from the edge, deliberately leaving headroom inside the same taller box for the new outside labels
+   and their leader lines so they don't clip against the `Card` component's `overflow-hidden`), and the
+   center total's font size bumped from `text-xl` to `text-2xl` to match. `components/dashboard/
+   chart-skeleton.tsx`'s `DonutChartSkeleton` was resized to match (`h-44 w-44` → `h-64 w-64`) so the
+   Suspense fallback doesn't cause a layout jump when the real chart mounts.
+4. Card order (Herd composition, Sex ratio, Newborn Kids, then the rest), the column-chart Newborn Kids
+   redesign, and the tightened card padding from the first refinement round are all unchanged.
+
+**Verification method, disclosed again explicitly:** this environment still has no physical iPhone and no
+working headless-browser/screenshot tool available (attempted again this round; a server-side static
+render of the label math was also attempted but Recharts' `Pie`/`PieChart` compute their SVG geometry via
+client-side effects that don't run under `renderToStaticMarkup`, so it produced an empty wrapper rather
+than a usable check). Correctness here rests on: a clean `tsc`/production build, TypeScript's own
+structural check that the label function's parameters match Recharts' real `PieLabelRenderProps` type, and
+following Recharts' own documented custom-pie-label-with-leader-line recipe (the same
+`cos(-midAngle*RADIAN)`/`sin(-midAngle*RADIAN)` formula their docs use) rather than an original one. The
+owner's own hands-on iPhone check is the real confirmation this round needs, more than usual.
+
 ## 13. Implementation note
 
 *(fill during/after build — record the actual measured bottleneck(s) found in 11a Task 1, and which

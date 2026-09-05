@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function DonutChartSkeleton() {
   return (
     <div className="flex flex-col items-center gap-4">
-      <Skeleton className="h-44 w-44 rounded-full" />
+      <Skeleton className="h-64 w-64 rounded-full" />
       <div className="flex flex-wrap justify-center gap-2">
         <Skeleton className="h-4 w-14 rounded-full" />
         <Skeleton className="h-4 w-14 rounded-full" />
