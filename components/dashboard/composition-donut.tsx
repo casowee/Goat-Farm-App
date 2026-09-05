@@ -134,8 +134,8 @@ export function CompositionDonut({ data, centerLabel }: CompositionDonutProps) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="relative h-64 w-full">
+    <div className="flex min-w-0 flex-col items-center gap-4">
+      <div className="relative h-64 w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie

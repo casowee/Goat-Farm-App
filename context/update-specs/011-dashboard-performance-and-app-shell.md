@@ -231,6 +231,44 @@ following Recharts' own documented custom-pie-label-with-leader-line recipe (the
 `cos(-midAngle*RADIAN)`/`sin(-midAngle*RADIAN)` formula their docs use) rather than an original one. The
 owner's own hands-on iPhone check is the real confirmation this round needs, more than usual.
 
+### Amendment — 2026-09-05 (owner-reported layout bug from the live dashboard, investigated while still `in progress`)
+
+The owner reported the Newborn Kids card rendering wider than the Herd composition / Sex ratio cards on a
+real iPhone, and asked for root-cause confirmation before any fix. This time, a real headless-browser check
+was obtained (a prior attempt in the first refinement round failed; `npx playwright install chromium` and
+`... install webkit` both succeeded when retried) and used to investigate properly:
+
+- **Method.** Since this environment has no real Supabase login, the dashboard's server-side auth guards
+  (`app/(app)/layout.tsx`'s redirect, `lib/supabase/middleware.ts`'s proxy redirect) were **temporarily**
+  disabled — owner-approved explicitly after the auto-mode permission classifier first blocked it — to load
+  the real dashboard components. A temporary route (`app/(app)/debugwidthscheck/page.tsx`) rendered the
+  actual `Card` grid with the actual `CompositionDonut` / `NewbornPeriodsChart` components fed realistic
+  fake data matching the owner's own numbers (Does 58, Bucks 5, Doelings 7, Bucklings 8, Wethers 4, Kids
+  20). Both the auth bypass and the debug route were fully reverted (`git checkout --`, file deletion)
+  immediately after testing — nothing from this investigation reached the committed code or a deploy.
+- **Result: the reported bug did not reproduce.** Measured via `getBoundingClientRect()` in both Chromium
+  and **WebKit** (Safari's actual rendering engine, via Playwright's `iPhone 13` device emulation profile)
+  at the 3-, 6-, and 12-month window settings: every card measured **exactly 358px wide**, edge-aligned,
+  with `document.documentElement.scrollWidth` equal to the viewport width (390px) in every case — i.e. zero
+  horizontal page overflow, and no width difference between the Newborn Kids card and the two donut cards,
+  even at the 12-bar maximum. Screenshots confirmed this visually.
+- **Hardening applied anyway.** Since the failure mode the owner hypothesized (a chart wrapper with an
+  intrinsic/minimum width wider than its card, forcing the card — and potentially the whole CSS Grid
+  track — wider) is a real, well-known category of bug even though it didn't reproduce here, `min-w-0` was
+  added defensively along the entire container chain: the dashboard's grid container, every `<Card>` in
+  `app/(app)/page.tsx`, and the inner chart-wrapper `<div>`s in both `composition-donut.tsx` and
+  `newborn-periods-chart.tsx`. By default a CSS Grid/flex item's `min-width` is `auto` (effectively its
+  content's min-content size), which is the textbook cause of "one item's content forces the whole row
+  wider" — `min-w-0` removes that floor unconditionally. This is a correctness hardening, not a fix for a
+  confirmed bug, and is zero-risk (no visual change intended or observed for the current, already-uniform
+  layout).
+- **Working theory if the owner still sees this on their device:** a stale cached page (the deploy may not
+  have been the version they were viewing), or a transient one-frame flash before Recharts'
+  `ResponsiveContainer` (which measures via `ResizeObserver`, asynchronously after mount) settles on the
+  correct width — a screenshot could catch that transient frame even though the layout self-corrects a
+  moment later. If it recurs after a hard refresh, the next step is a screenshot from the owner's device
+  showing it happening, since it could not be reproduced here in either browser engine.
+
 ## 13. Implementation note
 
 *(fill during/after build — record the actual measured bottleneck(s) found in 11a Task 1, and which

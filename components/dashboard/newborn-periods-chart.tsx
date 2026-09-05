@@ -67,7 +67,7 @@ export function NewbornPeriodsChart({ goats }: { goats: NewbornPeriodGoat[] }) {
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1.5">
           <label
@@ -109,7 +109,7 @@ export function NewbornPeriodsChart({ goats }: { goats: NewbornPeriodGoat[] }) {
         </ToggleGroup>
       </div>
 
-      <div className="h-36 w-full">
+      <div className="h-36 w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <XAxis

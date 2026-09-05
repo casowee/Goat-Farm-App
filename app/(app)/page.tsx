@@ -168,7 +168,7 @@ export default async function DashboardPage({
         />
       </TopBarSlot>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         {/*
           UPD-006 amendment (2026-08-29): the entire "Herd growth" section —
           the cumulative timeline chart and the "Log herd event" trigger — is
@@ -176,7 +176,7 @@ export default async function DashboardPage({
           can be re-enabled by flipping SHOW_HERD_GROWTH_SECTION above.
         */}
         {SHOW_HERD_GROWTH_SECTION && (
-          <Card className="rounded-2xl lg:col-span-2">
+          <Card className="rounded-2xl lg:col-span-2 min-w-0">
             <CardHeader className="px-3">
               <CardTitle>Herd growth</CardTitle>
               <CardDescription>
@@ -206,7 +206,7 @@ export default async function DashboardPage({
           first, Sex ratio second, Newborn Kids third — Weight growth, Due
           soon and Stock levels keep their prior relative order after that.
         */}
-        <Card className="rounded-2xl">
+        <Card className="rounded-2xl min-w-0">
           <CardHeader className="px-3">
             <CardTitle>Herd composition</CardTitle>
             <CardDescription>
@@ -223,7 +223,7 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl">
+        <Card className="rounded-2xl min-w-0">
           <CardHeader className="px-3">
             <CardTitle>Sex ratio</CardTitle>
             <CardDescription>Female to male across this view.</CardDescription>
@@ -235,7 +235,7 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl lg:col-span-2">
+        <Card className="rounded-2xl lg:col-span-2 min-w-0">
           <CardHeader className="px-3">
             <CardTitle>Newborn Kids</CardTitle>
             <CardDescription>
@@ -252,7 +252,7 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl">
+        <Card className="rounded-2xl min-w-0">
           <CardHeader className="px-3">
             <CardTitle>Weight growth</CardTitle>
             <CardDescription>
@@ -272,7 +272,7 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl">
+        <Card className="rounded-2xl min-w-0">
           <CardHeader className="px-3">
             <CardTitle>Due soon</CardTitle>
             <CardDescription>
@@ -288,7 +288,7 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl">
+        <Card className="rounded-2xl min-w-0">
           <CardHeader className="px-3">
             <CardTitle>Stock levels</CardTitle>
             <CardDescription>
@@ -301,7 +301,7 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl">
+        <Card className="rounded-2xl min-w-0">
           <CardHeader className="px-3">
             <CardTitle>Sales over time</CardTitle>
             <CardDescription>

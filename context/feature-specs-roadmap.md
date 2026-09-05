@@ -364,6 +364,16 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > leader line for thinner ones) — no click/hover/tap needed. Donuts grew from 176px to 256px to fill the
 > freed space. Full detail + the verification caveat (still no physical iPhone/browser available in this
 > environment) in the spec's own dated Amendment and `progress-tracker.md`.
+>
+> **Layout-bug investigation (2026-09-05):** the owner reported the Newborn Kids card rendering wider than
+> the donut cards on a real iPhone. A real headless browser (Chromium + WebKit, Playwright, retried
+> successfully this round) was used with a temporary, owner-approved auth bypass to load the real
+> components with realistic fake data — **the bug did not reproduce** in either engine at 3/6/12-month
+> windows (every card measured 358px, zero horizontal overflow); the auth bypass and debug route were both
+> fully reverted immediately after. `min-w-0` was still added defensively to the grid container, every
+> `Card`, and the chart-wrapper divs — the standard fix for "one grid item's content forces the row wider,"
+> applied as zero-risk hardening rather than a confirmed-bug fix. Full detail in the spec's own dated
+> Amendment and `progress-tracker.md`.
 
 **Task 1 result (2026-08-29):** confirmed from the generated types that spec 07 built health records as
 **one `health_records` table with a `record_type` enum + a `next_due_date` column** — not the separate
