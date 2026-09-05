@@ -110,6 +110,147 @@ export type Database = {
           },
         ]
       }
+      breeding_season_bucks: {
+        Row: {
+          buck_id: number
+          created_at: string
+          id: number
+          owner_id: string
+          season_id: number
+        }
+        Insert: {
+          buck_id: number
+          created_at?: string
+          id?: number
+          owner_id?: string
+          season_id: number
+        }
+        Update: {
+          buck_id?: number
+          created_at?: string
+          id?: number
+          owner_id?: string
+          season_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeding_season_bucks_buck_id_fkey"
+            columns: ["buck_id"]
+            isOneToOne: false
+            referencedRelation: "goats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_season_bucks_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_season_occurrences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      breeding_season_occurrences: {
+        Row: {
+          barn_id: number | null
+          created_at: string
+          end_date: string | null
+          id: number
+          note: string | null
+          owner_id: string
+          season_template_id: number | null
+          start_date: string
+        }
+        Insert: {
+          barn_id?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: number
+          note?: string | null
+          owner_id?: string
+          season_template_id?: number | null
+          start_date: string
+        }
+        Update: {
+          barn_id?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: number
+          note?: string | null
+          owner_id?: string
+          season_template_id?: number | null
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeding_season_occurrences_barn_id_fkey"
+            columns: ["barn_id"]
+            isOneToOne: false
+            referencedRelation: "barns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_season_occurrences_season_template_id_fkey"
+            columns: ["season_template_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_season_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      breeding_season_templates: {
+        Row: {
+          created_at: string
+          id: number
+          label: string
+          length_months: number
+          owner_id: string
+          start_month: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          label: string
+          length_months?: number
+          owner_id?: string
+          start_month: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          label?: string
+          length_months?: number
+          owner_id?: string
+          start_month?: number
+        }
+        Relationships: []
+      }
+      breeding_settings: {
+        Row: {
+          bucks_per_group: number
+          does_per_group: number
+          gestation_days: number
+          id: number
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          bucks_per_group?: number
+          does_per_group?: number
+          gestation_days?: number
+          id?: number
+          owner_id?: string
+          updated_at?: string
+        }
+        Update: {
+          bucks_per_group?: number
+          does_per_group?: number
+          gestation_days?: number
+          id?: number
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deworming: {
         Row: {
           created_at: string | null
@@ -150,6 +291,65 @@ export type Database = {
             referencedColumns: ["tag_number"]
           },
         ]
+      }
+      doe_performance_notes: {
+        Row: {
+          category: Database["public"]["Enums"]["doe_performance_category"]
+          created_at: string
+          doe_id: number
+          id: number
+          note: string | null
+          owner_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["doe_performance_category"]
+          created_at?: string
+          doe_id: number
+          id?: number
+          note?: string | null
+          owner_id?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["doe_performance_category"]
+          created_at?: string
+          doe_id?: number
+          id?: number
+          note?: string | null
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doe_performance_notes_doe_id_fkey"
+            columns: ["doe_id"]
+            isOneToOne: false
+            referencedRelation: "goats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      doe_performance_settings: {
+        Row: {
+          breeding_eligible_age_months: number
+          id: number
+          max_expected_interval_months: number
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          breeding_eligible_age_months?: number
+          id?: number
+          max_expected_interval_months?: number
+          owner_id?: string
+          updated_at?: string
+        }
+        Update: {
+          breeding_eligible_age_months?: number
+          id?: number
+          max_expected_interval_months?: number
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       goat_barn_moves: {
         Row: {
@@ -922,6 +1122,12 @@ export type Database = {
       }
     }
     Enums: {
+      doe_performance_category:
+        | "age"
+        | "health"
+        | "buck_issue"
+        | "other"
+        | "resolved"
       goat_origin: "born_here" | "purchased"
       goat_sex: "male" | "female"
       goat_status: "active" | "sold" | "deceased" | "stolen"
@@ -958,12 +1164,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -987,11 +1193,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1012,11 +1218,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1037,11 +1243,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1054,11 +1260,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1070,6 +1276,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      doe_performance_category: [
+        "age",
+        "health",
+        "buck_issue",
+        "other",
+        "resolved",
+      ],
       goat_origin: ["born_here", "purchased"],
       goat_sex: ["male", "female"],
       goat_status: ["active", "sold", "deceased", "stolen"],

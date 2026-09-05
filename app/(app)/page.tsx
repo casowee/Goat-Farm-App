@@ -6,7 +6,11 @@ import { DashboardCsvButton } from "@/components/dashboard/dashboard-csv-button"
 import { DonutChartSkeleton, LineChartSkeleton } from "@/components/dashboard/chart-skeleton";
 import { CompositionDonutLazy } from "@/components/dashboard/composition-donut-lazy";
 import { WeightTrendChartLazy } from "@/components/dashboard/weight-trend-chart-lazy";
-import { DueSoonList } from "@/components/dashboard/due-soon-list";
+import {
+  DueSoonList,
+  type BreedingDueRow,
+} from "@/components/dashboard/due-soon-list";
+import { BreedingStatus } from "@/components/dashboard/breeding-status";
 import { StockLevelsWidget } from "@/components/dashboard/stock-levels-widget";
 import { HerdTimelineChart } from "@/components/dashboard/herd-timeline-chart";
 import { NewbornPeriodsChart } from "@/components/dashboard/newborn-periods-chart";
@@ -19,6 +23,11 @@ import {
   dueSoon,
   type DueSoonSourceRecord,
 } from "@/lib/dashboard/due-soon";
+import { computeCurrentSeasonStatus } from "@/lib/breeding/status";
+import { computeBreedingReminders } from "@/lib/breeding/reminders";
+import { eligibleBreedingMales } from "@/lib/breeding/eligible-males";
+import type { SeasonTemplate } from "@/lib/breeding/templates";
+import { ApproveSeasonButton } from "@/components/breeding/approve-season-button";
 import {
   Card,
   CardAction,
@@ -69,6 +78,9 @@ export default async function DashboardPage({
     { data: inventory },
     { data: allGoats },
     { data: herdEvents },
+    { data: breedingOccurrences },
+    { data: breedingSeasonBucks },
+    { data: breedingTemplateRows },
   ] = await Promise.all([
     supabase.from("barns").select("id, name").order("name"),
     goatQuery,
@@ -79,9 +91,21 @@ export default async function DashboardPage({
     // log-event picker need.
     supabase
       .from("goats")
-      .select("id, tag, name, status, origin, date_of_birth, purchase_date")
+      .select(
+        "id, tag, name, sex, reproductive_state, status, origin, date_of_birth, purchase_date",
+      )
       .order("tag"),
     supabase.from("herd_events").select("event_type, event_date"),
+    // Feature 09 — the dashboard's compact breeding status line + the buck
+    // in/out reminders merged into "Due soon". Farm-wide, not barn-filtered.
+    supabase
+      .from("breeding_season_occurrences")
+      .select("id, season_template_id, start_date, end_date"),
+    supabase.from("breeding_season_bucks").select("season_id, buck_id"),
+    supabase
+      .from("breeding_season_templates")
+      .select("id, label, start_month, length_months")
+      .order("start_month"),
   ]);
 
   const barnLabel = hasBarnFilter
@@ -127,6 +151,89 @@ export default async function DashboardPage({
   const dueItems = dueSoon(dueSoonSource, {
     windowDays: DEFAULT_DUE_SOON_WINDOW_DAYS,
   });
+
+  // Feature 09 — breeding status line + buck in/out reminders (farm-wide).
+  const now = new Date();
+  const breedingTemplates: SeasonTemplate[] = breedingTemplateRows ?? [];
+
+  const allGoatRows = allGoats ?? [];
+  const allGoatById = new Map(allGoatRows.map((g) => [g.id, g]));
+  const { bucks: breedingBucks, bucklings: breedingBucklings } =
+    eligibleBreedingMales(allGoatRows, now);
+
+  const breedingBucksBySeason = new Map<
+    number,
+    { ids: number[]; tags: string[] }
+  >();
+  for (const row of breedingSeasonBucks ?? []) {
+    const entry = breedingBucksBySeason.get(row.season_id) ?? {
+      ids: [],
+      tags: [],
+    };
+    entry.ids.push(row.buck_id);
+    const tag = allGoatById.get(row.buck_id)?.tag;
+    if (tag) entry.tags.push(tag);
+    breedingBucksBySeason.set(row.season_id, entry);
+  }
+  const breedingOccurrenceRows = (breedingOccurrences ?? []).map((o) => {
+    const linked = breedingBucksBySeason.get(o.id) ?? { ids: [], tags: [] };
+    return {
+      id: o.id,
+      buck_ids: linked.ids,
+      buck_tags: linked.tags,
+      season_template_id: o.season_template_id,
+      start_date: o.start_date,
+      end_date: o.end_date,
+    };
+  });
+
+  const breedingSeasonStatus = computeCurrentSeasonStatus(
+    breedingTemplates,
+    breedingOccurrenceRows,
+    now,
+  );
+
+  const MS_PER_DAY = 86_400_000;
+  const todayMidnight = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const breedingDueItems: BreedingDueRow[] = computeBreedingReminders(
+    breedingTemplates,
+    breedingOccurrenceRows,
+    now,
+  )
+    .map((reminder, index) => {
+      const dueMidnight = new Date(
+        reminder.dueDate.getFullYear(),
+        reminder.dueDate.getMonth(),
+        reminder.dueDate.getDate(),
+      ).getTime();
+      const iso = `${reminder.dueDate.getFullYear()}-${String(
+        reminder.dueDate.getMonth() + 1,
+      ).padStart(2, "0")}-${String(reminder.dueDate.getDate()).padStart(2, "0")}`;
+      return {
+        key: `${reminder.type}-${index}`,
+        type: reminder.type,
+        label: reminder.label,
+        dueDate: iso,
+        daysUntilDue: Math.round((dueMidnight - todayMidnight) / MS_PER_DAY),
+        isEstimate: reminder.isEstimate,
+        action:
+          reminder.type === "introduce_males" && reminder.templateId != null ? (
+            <ApproveSeasonButton
+              templateId={reminder.templateId}
+              suggestedStart={iso}
+              bucks={breedingBucks}
+              bucklings={breedingBucklings}
+              barns={barns ?? []}
+              templates={breedingTemplates}
+            />
+          ) : undefined,
+      };
+    })
+    .filter((item) => item.daysUntilDue <= DEFAULT_DUE_SOON_WINDOW_DAYS);
 
   const timeline = computeHerdTimeline(allGoats ?? [], herdEvents ?? []);
   const herdSizeNow =
@@ -274,16 +381,29 @@ export default async function DashboardPage({
 
         <Card className="rounded-2xl min-w-0">
           <CardHeader className="px-3">
+            <CardTitle>Breeding season</CardTitle>
+            <CardDescription>
+              Whether a buck is currently with the herd.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-3">
+            <BreedingStatus status={breedingSeasonStatus} now={now} />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl min-w-0">
+          <CardHeader className="px-3">
             <CardTitle>Due soon</CardTitle>
             <CardDescription>
-              Vaccinations, deworming and checkups due in the next{" "}
-              {DEFAULT_DUE_SOON_WINDOW_DAYS} days.
+              Vaccinations, deworming, checkups and breeding reminders due in
+              the next {DEFAULT_DUE_SOON_WINDOW_DAYS} days.
             </CardDescription>
           </CardHeader>
           <CardContent className="px-3">
             <DueSoonList
               items={dueItems}
               windowDays={DEFAULT_DUE_SOON_WINDOW_DAYS}
+              breedingItems={breedingDueItems}
             />
           </CardContent>
         </Card>

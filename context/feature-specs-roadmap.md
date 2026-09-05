@@ -53,7 +53,7 @@ Small features stay a single row. Sub-feature tables below are filled in for fin
 | 2     | 06  | family-tree                 | Both       | `done` ***    |
 | 2     | 07  | health-records              | Both       | `in progress` **** |
 | 2     | 08  | weight-records              | Both       | `in progress` ◀ — **paused** (built; awaiting owner's manual test — no further work until confirmed) |
-| 2     | 09  | breeding-and-inbreeding     | Both       | `planned` ◀ — **deferred at owner's request** (not started; resume only when the owner says so) |
+| 2     | 09  | breeding-and-inbreeding     | Both       | `in progress` ◀ — **resumed at owner's request 2026-09-05**, built ahead of `11` (out of roadmap order, consistent with how `10`/`12` were sequenced earlier). Scope is seasonal/farm-wide breeding only; the batch inbreeding check is **deferred to a future update spec** (Section 6 of the spec keeps the design) |
 | 3     | 10  | inventory                   | Both       | `done` ***** — built **ahead of 08/09 at the owner's request** (out of normal roadmap order) and confirmed working by the owner in the running app (2026-08-29) |
 | 3     | 11  | sales-and-purchases         | Both       | `planned`     |
 | 4     | 12  | dashboard-analytics         | Both       | `done` ****** — built **ahead of 09 and 11 at the owner's request** (out of roadmap order) and confirmed working by the owner in the running app (2026-08-29); Sales widget deferred to a "coming soon" placeholder until 11 exists |
@@ -75,8 +75,9 @@ Small features stay a single row. Sub-feature tables below are filled in for fin
 > standing "owner-only, needs their real credentials" RLS-isolation item for **every owner-scoped table
 > built so far**: `barns`, `goats`, `goat_barn_moves`, `goat_breed_composition`, `health_records`,
 > `weights`, `health_condition_presets`, `inventory_items`. Not an automated test — a manual check by the
-> owner in the running app. Future owner-scoped tables (09 `breedings`, spec 10's inventory extensions,
-> 11 `sales_purchases`, …) still need their own confirmation as they ship.
+> owner in the running app. Future owner-scoped tables (09 `breeding_settings` / `breeding_season_occurrences` /
+> `breeding_season_bucks` / `breeding_season_templates` [shipped 2026-09-05], 11 `sales_purchases`, …)
+> still need their own confirmation as they ship.
 
 ---
 
@@ -231,14 +232,30 @@ add/edit dialog (3 fields — no wizard, per the Form Length check), and the goa
 (growth `LineChart` + newest-first history list). No name collision with the legacy `weight_history`
 table — left untouched, same as 07's legacy health tables.
 
-### 09 — breeding-and-inbreeding · Both · `planned` — ⏸ DEFERRED at the owner's request
-Breeding records (sire/dam, mating, expected/actual kidding, offspring) + the relatedness check that warns on close matings. **Depends on:** 06.
-*Likely split:* `breedings` table + actions `(Back-end)` · relatedness/inbreeding check as a pure `lib` function `(Back-end · logic)` · warning + override-confirm UI `(Front-end)`.
+### 09 — breeding-and-inbreeding · Both · `in progress` — resumed 2026-09-05, built ahead of 11
+Seasonal, farm-wide breeding: the farm runs open-pasture group breeding (1 buck : ~30 does), so 09 tracks
+**breeding seasons** ("males in" / "males out" windows) and a computed kidding window, **not** individual
+sire+dam mating records. **Depends on:** 06 (done), `UPD-008` (active-goat filtering, reused for the buck
+picker), `lib/dashboard/herd-composition.ts` (reused for buck/doe counts). Spec:
+`context/feature-specs/09-breeding.md`.
 
-> ⏸ **Deferred, not abandoned (owner's decision, 2026-08-29).** 09 has **not been started** and no spec
-> is written yet. The owner has chosen to build **10 — inventory** ahead of it. **Do not begin 09** until
-> the owner explicitly says to resume it. It remains the real next-up item (with 08's outstanding test),
-> not 11.
+*Split as built:* four additive migrations (`breeding_settings`, `breeding_season_occurrences`,
+`breeding_season_bucks` — a season can run more than one buck — and `breeding_season_templates` — named,
+editable recurring windows, replacing the old flat array) + server actions `(Back-end)` · pure
+`lib/breeding/{kidding-window,eligible-males,templates,capacity,status,reminders,timeline}.ts`
+`(Back-end · logic)` · settings form + templates manager, season list + multi-buck log dialog, seasonal
+timeline, an "Approve season" flow (opens the same log dialog pre-filled from a template), dashboard
+status line + Due-soon reminder merge `(Front-end)`. The buck picker is a multi-select (chips) filtered
+through `eligibleBreedingMales` — Kids are never shown, Bucklings sit behind a toggle.
+
+> ▶ **Resumed at the owner's request (2026-09-05), built ahead of `11`** — out of roadmap order, the same
+> way `10`/`12` were sequenced earlier. The **batch inbreeding check (Section 6 of the spec) is deferred to
+> its own future update spec** (owner's decision 2026-09-05) — the design is kept in the spec, reusing
+> `06`'s pedigree walk unchanged, so it is a cheap addition later. `lib/breeding/inbreeding-check.ts` is
+> **not** built in this pass and no warning is wired into the season form.
+>
+> **Cross-account RLS on `breeding_settings` and `breeding_season_occurrences` still needs the owner's
+> second-account confirmation** as it ships (standing rule for new owner-scoped tables).
 
 ---
 
@@ -374,6 +391,32 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > `Card`, and the chart-wrapper divs — the standard fix for "one grid item's content forces the row wider,"
 > applied as zero-risk hardening rather than a confirmed-bug fix. Full detail in the spec's own dated
 > Amendment and `progress-tracker.md`.
+
+> 🐐 **`UPD-012` (Doe Reproductive Performance Tracking) — `done`, built + owner-tested in the running
+> app 2026-09-05.** `context/update-specs/012-doe-performance-tracking.md`. Reads only
+> already-shipped goat / lineage data (05, 06 `dam_id`) + health records (07, read-only) — **does not
+> depend on `09`**. Flags currently-active does that are underperforming: overdue since their last
+> kidding, a long historical average interval, or past breeding-eligible age with zero kiddings (a doe
+> can carry more than one flag; a doe too young to judge — by **raw age**, not life-stage label — is
+> excluded, not flagged). The flag is **never stored** — recomputed live on every page load, so a
+> settings change reflects immediately. Two additive migrations the owner must run + `npm run
+> gen:types`: `20260905000005_doe_performance_settings.sql` (one row per owner — max expected interval
+> months default 13, breeding-eligible age months default **12**) and
+> `20260905000006_doe_performance_notes.sql` (`doe_performance_category` enum + accumulating
+> owner-recorded investigation notes). Both `bigserial` id, single `for all` owner RLS; types hand-added
+> to `types/database.types.ts` as the stand-in until `gen:types` runs. Pure logic in
+> `lib/breeding/doe-performance.ts` (`computeKiddingEvents` — groups kids born within
+> `KIDDING_EVENT_GROUPING_DAYS = 3` into one event; `computeDoePerformance` — returns `null` for a
+> not-yet-applicable young doe, otherwise a live flag list; reuses `ageInMonths()` from
+> `lib/goats/stage.ts`). UI: **a route-backed tab strip in the Breeding area** (`Seasons` /
+> `Doe Performance`, `components/breeding/breeding-tabs.tsx`); the Doe Performance tab has a total-count
+> summary, tag/name search, flag-type filter and a sort control, expandable per-doe cards (kidding
+> history, recent health records via 07's `listHealthRecordsByGoat`, accumulating note form), and every
+> duration rendered via `formatAge()` (UPD-009); plus a "Doe performance" section on
+> `/breeding/settings`. Section 14 open questions resolved by the owner 2026-09-05: ±3-day
+> kidding-event grouping window; eligible-age default first 10, **amended same day to 12** ("a doeling
+> can have kids once she is older than a year") — the check was already raw-age-based, no stage bug.
+> `npm run build` + `tsc` clean; lint at project baseline.
 
 **Task 1 result (2026-08-29):** confirmed from the generated types that spec 07 built health records as
 **one `health_records` table with a `record_type` enum + a `next_due_date` column** — not the separate
