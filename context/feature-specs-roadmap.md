@@ -330,6 +330,23 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > ships with a clearly-labelled "coming soon" placeholder tile in its place (owner's choice, 2026-08-29).
 > The `◀ next` marker stays on `08` / `09`.
 
+> ⚡ **`UPD-011` (Dashboard Performance, Compact Newborn Chart & App-Shell) — `in progress`, built
+> 2026-09-05, awaiting the owner's hands-on iPhone test.**
+> `context/update-specs/011-dashboard-performance-and-app-shell.md`. No migration. **11a:** measured a real
+> sequential-Supabase-query waterfall (~1.67s for the dashboard's 7 queries) and parallelized it into two
+> `Promise.all` phases (~0.35s for the same batch); code-split the Recharts-backed `CompositionDonut` /
+> `WeightTrendChart` via `next/dynamic({ ssr: false })` behind `<Suspense>` skeletons so the ~390KB chart
+> chunk no longer blocks the rest of the page. **11b:** `components/dashboard/newborn-periods-chart.tsx`
+> replaced its Recharts `BarChart` with a plain vertical list (label + inline scaled bar + count) — grows
+> taller, never wider, so no window/end-date combination can cause horizontal scrolling; zero-count months
+> still render as a visible row per `UPD-007`. **11c:** `app/manifest.ts` + `app/icon.tsx` /
+> `app/apple-icon.tsx` / `app/manifest-icon/route.tsx` (a generated placeholder monogram,
+> `lib/branding/app-icon.tsx`, owner-confirmed acceptable for now) + `appleWebApp` metadata
+> (`app/layout.tsx`, `statusBarStyle: 'black-translucent'`, owner-confirmed) for a standalone/full-screen
+> iOS install; `proxy.ts`'s matcher extended so the manifest/icons stay reachable without an authenticated
+> session. No service worker built (deliberately out of scope). **Still needs the owner's own hands-on
+> test** (real iPhone re-install) before this closes — see `progress-tracker.md`.
+
 **Task 1 result (2026-08-29):** confirmed from the generated types that spec 07 built health records as
 **one `health_records` table with a `record_type` enum + a `next_due_date` column** — not the separate
 `vaccinations` / `dewormings` tables in `architecture-context.md`'s original sketch (those names belong to

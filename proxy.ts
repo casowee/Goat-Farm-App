@@ -9,6 +9,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // UPD-011 (11c) — app-shell routes (the manifest + its generated icons)
+    // must stay reachable without a session: the browser/OS fetches them to
+    // decide how the installed icon should look and launch, not as an
+    // authenticated page view. Redirecting them to /login would break the
+    // installed icon (Chrome/iOS would fetch HTML where an image is expected).
+    "/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|manifest-icon|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

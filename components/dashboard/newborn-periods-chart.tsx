@@ -1,15 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,10 +8,6 @@ import {
   type NewbornPeriodGoat,
   type NewbornWindowMonths,
 } from "@/lib/dashboard/newborn-periods";
-
-const BAR = "var(--accent-primary)";
-const GRID = "var(--border-default)";
-const AXIS = "var(--text-muted)";
 
 const WINDOW_OPTIONS: NewbornWindowMonths[] = [3, 6, 12];
 const DEFAULT_WINDOW: NewbornWindowMonths = 6;
@@ -37,13 +24,15 @@ function parseAnchor(iso: string): Date {
 }
 
 /**
- * UPD-007 — "Newborn Kids" bar chart, bucketed by calendar month, with a 3 / 6 /
- * 12-month window selector (default 6) applied backward from a selectable end
- * date (default today; UPD-007 amendment 2026-08-29). Kids born here per month;
- * months with no births render as a visible zero bar, not a gap (that's the
- * whole point). Everything is recomputed client-side from the goat data already
- * on the page, so no reload is needed. Colours come from design tokens, same as
- * the other charts.
+ * UPD-011 (11b) — "Newborn Kids" as a compact vertical list rather than a
+ * Recharts bar chart: one row per month, a small inline horizontal bar, and
+ * the count. A taller list as more months are selected, but the width never
+ * changes — so no horizontal scrolling is possible at any window length or
+ * end date, by construction (unlike a bar chart, which gets cramped or needs
+ * to scroll as the number of bars grows). Zero-count months still render as a
+ * visible row (near-empty bar, explicit "0") — the rule UPD-007 established.
+ * Period selector, end-date picker and the factual caption are unchanged from
+ * UPD-007.
  */
 export function NewbornPeriodsChart({ goats }: { goats: NewbornPeriodGoat[] }) {
   const [windowMonths, setWindowMonths] =
@@ -54,6 +43,12 @@ export function NewbornPeriodsChart({ goats }: { goats: NewbornPeriodGoat[] }) {
     () => computeNewbornsByPeriod(goats, windowMonths, parseAnchor(endDate)),
     [goats, windowMonths, endDate],
   );
+
+  // Scale every bar against the largest count currently visible, not a fixed
+  // constant — so the list stays legible whether the busiest month had 2 kids
+  // or 20. Falls back to 1 when every visible month is zero, so all bars
+  // render empty rather than dividing by zero.
+  const maxCount = Math.max(1, ...rows.map((row) => row.count));
 
   return (
     <div className="flex flex-col gap-4">
@@ -98,59 +93,31 @@ export function NewbornPeriodsChart({ goats }: { goats: NewbornPeriodGoat[] }) {
         </ToggleGroup>
       </div>
 
-      <div className="h-60 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={rows}
-            margin={{ top: 8, right: 12, bottom: 0, left: -12 }}
-          >
-            <CartesianGrid
-              stroke={GRID}
-              strokeDasharray="3 3"
-              vertical={false}
-            />
-            <XAxis
-              dataKey="periodLabel"
-              stroke={AXIS}
-              tick={{ fill: AXIS, fontSize: 11 }}
-              tickMargin={8}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              stroke={AXIS}
-              tick={{ fill: AXIS, fontSize: 11 }}
-              width={40}
-              allowDecimals={false}
-              domain={[0, "dataMax + 1"]}
-            />
-            <Tooltip
-              cursor={{ fill: "var(--bg-subtle)" }}
-              contentStyle={{
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-default)",
-                borderRadius: 12,
-                color: "var(--text-primary)",
-                fontSize: 12,
-              }}
-              labelStyle={{ color: "var(--text-muted)" }}
-              formatter={(value: unknown) => [
-                `${Number(value)} ${Number(value) === 1 ? "kid" : "kids"}`,
-                "Born",
-              ]}
-            />
-            <Bar
-              dataKey="count"
-              fill={BAR}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={48}
-              // A zero-birth month still draws a 3px sliver so it reads as a
-              // visible "0" on the axis, not a gap (UPD-007 acceptance).
-              minPointSize={3}
-              isAnimationActive={false}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <ul className="flex flex-col gap-2">
+        {rows.map((row) => {
+          const widthPct = (row.count / maxCount) * 100;
+          return (
+            <li
+              key={row.periodLabel}
+              className="flex items-center gap-3 text-sm"
+            >
+              <span className="w-16 shrink-0 text-xs text-copy-muted">
+                {row.periodLabel}
+              </span>
+              <span className="h-2.5 flex-1 min-w-0 overflow-hidden rounded-full bg-subtle">
+                <span
+                  className="block h-full rounded-full bg-brand"
+                  style={{ width: `${widthPct}%` }}
+                  aria-hidden
+                />
+              </span>
+              <span className="w-6 shrink-0 text-right text-xs tabular-nums text-copy-secondary">
+                {row.count}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
