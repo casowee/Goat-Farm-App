@@ -1,6 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,6 +16,9 @@ import {
   type NewbornPeriodGoat,
   type NewbornWindowMonths,
 } from "@/lib/dashboard/newborn-periods";
+
+const BAR = "var(--accent-primary)";
+const AXIS = "var(--text-muted)";
 
 const WINDOW_OPTIONS: NewbornWindowMonths[] = [3, 6, 12];
 const DEFAULT_WINDOW: NewbornWindowMonths = 6;
@@ -23,16 +34,27 @@ function parseAnchor(iso: string): Date {
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
 }
 
+/** "Mar 2026" -> "Mar" — the axis only has room for the abbreviated month. */
+function shortLabel(periodLabel: string): string {
+  return periodLabel.split(" ")[0];
+}
+
 /**
- * UPD-011 (11b) — "Newborn Kids" as a compact vertical list rather than a
- * Recharts bar chart: one row per month, a small inline horizontal bar, and
- * the count. A taller list as more months are selected, but the width never
- * changes — so no horizontal scrolling is possible at any window length or
- * end date, by construction (unlike a bar chart, which gets cramped or needs
- * to scroll as the number of bars grows). Zero-count months still render as a
- * visible row (near-empty bar, explicit "0") — the rule UPD-007 established.
- * Period selector, end-date picker and the factual caption are unchanged from
- * UPD-007.
+ * UPD-011 refinement round (2026-09-05, owner testing) — back to a standard
+ * column chart (bars rising from a baseline, months along the bottom axis)
+ * rather than UPD-011's original horizontal-list redesign, which the owner
+ * found less readable in practice. The chart's height is capped
+ * (`h-36`, 144px) regardless of the 3/6/12-month window, so it stays compact.
+ *
+ * The "no horizontal scrolling" requirement is met structurally, not by
+ * trimming content: Recharts' `ResponsiveContainer` always renders its SVG at
+ * exactly its parent's measured width and maps every category into that fixed
+ * width — it cannot overflow the container, regardless of how many months are
+ * in the window. Legibility at 12 months is kept by (a) dropping the Y axis
+ * entirely (the Tooltip carries the exact count; the bar height and a visible
+ * sliver for zero-count months carry the at-a-glance read), and (b)
+ * abbreviating the X axis to the bare month ("Mar" not "Mar 2026") — the
+ * Tooltip's label still shows the full "Mar 2026" on hover/tap.
  */
 export function NewbornPeriodsChart({ goats }: { goats: NewbornPeriodGoat[] }) {
   const [windowMonths, setWindowMonths] =
@@ -43,12 +65,6 @@ export function NewbornPeriodsChart({ goats }: { goats: NewbornPeriodGoat[] }) {
     () => computeNewbornsByPeriod(goats, windowMonths, parseAnchor(endDate)),
     [goats, windowMonths, endDate],
   );
-
-  // Scale every bar against the largest count currently visible, not a fixed
-  // constant — so the list stays legible whether the busiest month had 2 kids
-  // or 20. Falls back to 1 when every visible month is zero, so all bars
-  // render empty rather than dividing by zero.
-  const maxCount = Math.max(1, ...rows.map((row) => row.count));
 
   return (
     <div className="flex flex-col gap-4">
@@ -93,31 +109,48 @@ export function NewbornPeriodsChart({ goats }: { goats: NewbornPeriodGoat[] }) {
         </ToggleGroup>
       </div>
 
-      <ul className="flex flex-col gap-2">
-        {rows.map((row) => {
-          const widthPct = (row.count / maxCount) * 100;
-          return (
-            <li
-              key={row.periodLabel}
-              className="flex items-center gap-3 text-sm"
-            >
-              <span className="w-16 shrink-0 text-xs text-copy-muted">
-                {row.periodLabel}
-              </span>
-              <span className="h-2.5 flex-1 min-w-0 overflow-hidden rounded-full bg-subtle">
-                <span
-                  className="block h-full rounded-full bg-brand"
-                  style={{ width: `${widthPct}%` }}
-                  aria-hidden
-                />
-              </span>
-              <span className="w-6 shrink-0 text-right text-xs tabular-nums text-copy-secondary">
-                {row.count}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="h-36 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+            <XAxis
+              dataKey="periodLabel"
+              tickFormatter={shortLabel}
+              stroke={AXIS}
+              tick={{ fill: AXIS, fontSize: 10 }}
+              tickLine={false}
+              axisLine={{ stroke: "var(--border-default)" }}
+              interval={0}
+              tickMargin={6}
+            />
+            <YAxis hide domain={[0, "dataMax + 1"]} allowDecimals={false} />
+            <Tooltip
+              cursor={{ fill: "var(--bg-subtle)" }}
+              contentStyle={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-default)",
+                borderRadius: 12,
+                color: "var(--text-primary)",
+                fontSize: 12,
+              }}
+              labelStyle={{ color: "var(--text-muted)" }}
+              formatter={(value: unknown) => [
+                `${Number(value)} ${Number(value) === 1 ? "kid" : "kids"}`,
+                "Born",
+              ]}
+            />
+            <Bar
+              dataKey="count"
+              fill={BAR}
+              radius={[3, 3, 0, 0]}
+              maxBarSize={28}
+              // A zero-birth month still draws a 2px sliver so it reads as a
+              // visible "0" on the axis, not a gap (UPD-007 acceptance).
+              minPointSize={2}
+              isAnimationActive={false}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

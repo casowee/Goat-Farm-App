@@ -180,7 +180,7 @@ export default async function DashboardPage({
         */}
         {SHOW_HERD_GROWTH_SECTION && (
           <Card className="rounded-2xl lg:col-span-2">
-            <CardHeader>
+            <CardHeader className="px-3">
               <CardTitle>Herd growth</CardTitle>
               <CardDescription>
                 Whole-farm herd size over time — births and purchases from goat
@@ -191,7 +191,7 @@ export default async function DashboardPage({
                 <LogHerdEventDialog goats={pickerGoats} />
               </CardAction>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3">
               {timeline.length > 0 ? (
                 <HerdTimelineChart data={timeline} />
               ) : (
@@ -204,15 +204,49 @@ export default async function DashboardPage({
           </Card>
         )}
 
+        {/*
+          UPD-011 refinement (2026-09-05, owner testing): Herd composition
+          first, Sex ratio second, Newborn Kids third — Weight growth, Due
+          soon and Stock levels keep their prior relative order after that.
+        */}
+        <Card className="rounded-2xl">
+          <CardHeader className="px-3">
+            <CardTitle>Herd composition</CardTitle>
+            <CardDescription>
+              {hasBarnFilter
+                ? `Active goats in ${barnLabel}, by stage.`
+                : "Active goats, by stage."}{" "}
+              Sold, deceased and stolen goats are not counted.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-3">
+            <Suspense fallback={<DonutChartSkeleton />}>
+              <CompositionDonutLazy data={stageDonut} centerLabel="goats" />
+            </Suspense>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader className="px-3">
+            <CardTitle>Sex ratio</CardTitle>
+            <CardDescription>Female to male across this view.</CardDescription>
+          </CardHeader>
+          <CardContent className="px-3">
+            <Suspense fallback={<DonutChartSkeleton />}>
+              <CompositionDonutLazy data={sexDonut} centerLabel="goats" />
+            </Suspense>
+          </CardContent>
+        </Card>
+
         <Card className="rounded-2xl lg:col-span-2">
-          <CardHeader>
+          <CardHeader className="px-3">
             <CardTitle>Newborn Kids</CardTitle>
             <CardDescription>
               Kids born on the farm each month. Zero-birth months show as an
               empty bar, not a gap.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+          <CardContent className="flex flex-col gap-3 px-3">
             <NewbornPeriodsChart goats={newbornGoats} />
             <p className="text-xs text-copy-muted">
               Shows when kids have been born — useful for spotting your farm&apos;s
@@ -222,42 +256,13 @@ export default async function DashboardPage({
         </Card>
 
         <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Herd composition</CardTitle>
-            <CardDescription>
-              {hasBarnFilter
-                ? `Active goats in ${barnLabel}, by stage.`
-                : "Active goats, by stage."}{" "}
-              Sold, deceased and stolen goats are not counted.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<DonutChartSkeleton />}>
-              <CompositionDonutLazy data={stageDonut} centerLabel="goats" />
-            </Suspense>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Sex ratio</CardTitle>
-            <CardDescription>Female to male across this view.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<DonutChartSkeleton />}>
-              <CompositionDonutLazy data={sexDonut} centerLabel="goats" />
-            </Suspense>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
+          <CardHeader className="px-3">
             <CardTitle>Weight growth</CardTitle>
             <CardDescription>
               Average recorded weight per month across the herd.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3">
             {weightTrend.length > 0 ? (
               <Suspense fallback={<LineChartSkeleton />}>
                 <WeightTrendChartLazy data={weightTrend} />
@@ -271,14 +276,14 @@ export default async function DashboardPage({
         </Card>
 
         <Card className="rounded-2xl">
-          <CardHeader>
+          <CardHeader className="px-3">
             <CardTitle>Due soon</CardTitle>
             <CardDescription>
               Vaccinations, deworming and checkups due in the next{" "}
               {DEFAULT_DUE_SOON_WINDOW_DAYS} days.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3">
             <DueSoonList
               items={dueItems}
               windowDays={DEFAULT_DUE_SOON_WINDOW_DAYS}
@@ -287,27 +292,27 @@ export default async function DashboardPage({
         </Card>
 
         <Card className="rounded-2xl">
-          <CardHeader>
+          <CardHeader className="px-3">
             <CardTitle>Stock levels</CardTitle>
             <CardDescription>
               Low or out-of-stock inventory items (farm-wide — not affected by
               the barn filter).
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3">
             <StockLevelsWidget items={inventory ?? []} />
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl">
-          <CardHeader>
+          <CardHeader className="px-3">
             <CardTitle>Sales over time</CardTitle>
             <CardDescription>
               Coming soon — available once the Sales &amp; Purchases module is
               built.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3">
             <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-surface-border text-xs text-copy-faint">
               Not yet available
             </div>

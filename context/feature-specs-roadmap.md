@@ -336,16 +336,24 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > sequential-Supabase-query waterfall (~1.67s for the dashboard's 7 queries) and parallelized it into two
 > `Promise.all` phases (~0.35s for the same batch); code-split the Recharts-backed `CompositionDonut` /
 > `WeightTrendChart` via `next/dynamic({ ssr: false })` behind `<Suspense>` skeletons so the ~390KB chart
-> chunk no longer blocks the rest of the page. **11b:** `components/dashboard/newborn-periods-chart.tsx`
-> replaced its Recharts `BarChart` with a plain vertical list (label + inline scaled bar + count) — grows
-> taller, never wider, so no window/end-date combination can cause horizontal scrolling; zero-count months
-> still render as a visible row per `UPD-007`. **11c:** `app/manifest.ts` + `app/icon.tsx` /
+> chunk no longer blocks the rest of the page. **11b (reversed 2026-09-05 — see amendment below):**
+> `components/dashboard/newborn-periods-chart.tsx` is a Recharts `BarChart` again (height-capped at 144px,
+> abbreviated month labels), not the vertical list first shipped; zero-count months still render as a
+> visible bar per `UPD-007`. **11c:** `app/manifest.ts` + `app/icon.tsx` /
 > `app/apple-icon.tsx` / `app/manifest-icon/route.tsx` (a generated placeholder monogram,
 > `lib/branding/app-icon.tsx`, owner-confirmed acceptable for now) + `appleWebApp` metadata
 > (`app/layout.tsx`, `statusBarStyle: 'black-translucent'`, owner-confirmed) for a standalone/full-screen
 > iOS install; `proxy.ts`'s matcher extended so the manifest/icons stay reachable without an authenticated
 > session. No service worker built (deliberately out of scope). **Still needs the owner's own hands-on
 > test** (real iPhone re-install) before this closes — see `progress-tracker.md`.
+>
+> **Refinement round (2026-09-05, owner tested the first build on a real iPhone, folded in while still
+> `in progress`):** dashboard card order changed to Herd composition → Sex ratio → Newborn Kids → Weight
+> growth → Due soon → Stock levels; the Newborn Kids widget reverted from 11b's vertical list to a
+> compact Recharts column chart (144px-tall, abbreviated month labels); every dashboard card's horizontal
+> padding tightened 16px → 12px. Full detail + the verification-method caveat (no physical iPhone/browser
+> available to confirm the 12-month no-scroll claim directly) in the spec's own dated Amendment and
+> `progress-tracker.md`.
 
 **Task 1 result (2026-08-29):** confirmed from the generated types that spec 07 built health records as
 **one `health_records` table with a `record_type` enum + a `next_due_date` column** — not the separate

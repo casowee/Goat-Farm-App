@@ -143,6 +143,48 @@ tab (not installed) with no regressions.
 - Amends the chart built in: `context/update-specs/007-newborn-period-chart-and-event-simplification.md`.
 - Builds on the redesign in: `context/update-specs/006-dashboard-redesign-and-herd-population.md`.
 
+### Amendment — 2026-09-05 (owner request, refinement round from real iPhone testing, folded in while still `in progress`)
+
+After the first build shipped, the owner tested it on a real iPhone (screenshot reviewed) and asked for
+three refinements, folded into this spec rather than filed separately since it was still `in progress`:
+
+1. **Dashboard card order.** Herd composition first, Sex ratio second, Newborn Kids third (right after Sex
+   ratio, before Weight growth) — Weight growth, Due soon, and Stock levels keep their prior relative
+   order after that. `app/(app)/page.tsx`'s grid was reordered accordingly. The agent agreed this ordering
+   made sense (demographic snapshot cards first, then the newborn trend, then operational/actionable
+   widgets) and did not propose an alternative.
+2. **Newborn Kids chart redesign, reversed from 11b's original list.** 11b's compact vertical list (one
+   row per month, an inline horizontal bar, the count) tested less readable in practice than a standard
+   column chart. `components/dashboard/newborn-periods-chart.tsx` now renders a Recharts `BarChart` again
+   — bars rising from a baseline, months abbreviated along the bottom axis (e.g. "Mar", not "Mar 2026";
+   the full "Mar 2026" still appears in the Tooltip on hover/tap) — with the chart container height capped
+   at a fixed `h-36` (144px) regardless of the 3/6/12-month window, so it stays compact. **The "no
+   horizontal scrolling, at any window length" requirement from 11b is preserved, but by a different
+   mechanism than the list:** Recharts' `ResponsiveContainer` always renders its SVG at exactly its
+   parent's measured pixel width and maps every category (month) into that fixed width via a band scale —
+   it cannot overflow the container regardless of category count, so 12 narrow bars fit the same way 3 do,
+   just thinner. The Y axis was dropped entirely (the Tooltip carries the exact count; bar height plus a
+   2px `minPointSize` sliver for zero-count months carries the at-a-glance read) to give the bars maximum
+   width. `computeNewbornsByPeriod` (`lib/dashboard/newborn-periods.ts`) is unchanged — this remains a
+   presentation-only swap; the zero-count-month-still-renders-as-a-visible-bar rule from `UPD-007` is
+   unchanged.
+3. **Tighter card padding, dashboard-wide.** Every `CardHeader`/`CardContent` on the dashboard page had its
+   horizontal padding reduced from the shadcn default (`px-(--card-spacing)`, 16px) to `px-3` (12px) via a
+   `className` override at each call site in `app/(app)/page.tsx` — deliberately **not** an edit to
+   `components/ui/card.tsx` itself, so the change is scoped to the dashboard rather than every card in the
+   app (`code-standards.md`'s "no edits to `components/ui/*`" convention for this dashboard unit,
+   established back in feature 12). Only horizontal padding changed; vertical spacing (`py` on the outer
+   `Card`, driven by the same `--card-spacing` variable) was left alone, matching what the owner asked for.
+   The Summary Stats row (`components/dashboard/summary-stats.tsx`) uses its own stat-tile layout, not the
+   `Card` component, and was left untouched — flagged for the owner to confirm whether it should match.
+
+**Verification method for the "no horizontal scroll at 12 months" requirement:** this environment has no
+physical iPhone and no working headless-browser tool (a Playwright fetch was attempted and did not
+complete), so this was verified by (a) a clean production build with no errors, and (b) the pixel-budget
+arithmetic + Recharts' band-scale rendering guarantee described above, rather than a live screenshot. The
+owner's own hands-on iPhone check (Section 11) still stands as the real confirmation, same as the rest of
+this spec.
+
 ## 13. Implementation note
 
 *(fill during/after build — record the actual measured bottleneck(s) found in 11a Task 1, and which
