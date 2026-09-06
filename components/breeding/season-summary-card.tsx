@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { computeKiddingWindow } from "@/lib/breeding/kidding-window";
 import { addMonths, parseDateOnly } from "@/lib/breeding/season";
+import { GoatLink } from "@/components/goats/goat-link";
 import type { EligibleMale } from "@/lib/breeding/eligible-males";
 import type { SeasonTemplate } from "@/lib/breeding/templates";
 
@@ -61,13 +62,21 @@ export function SeasonSummaryCard({
   const window = start
     ? computeKiddingWindow(start, end, gestationDays)
     : null;
-  const bucksLabel =
-    bucks.length > 0
-      ? bucks.map(seasonBuckLabel).join(", ")
-      : "No bucks on record";
-  const heading = template
+  // Every buck is a link to its own detail page (shared GoatLink component).
+  const bucksNode: ReactNode =
+    bucks.length > 0 ? (
+      bucks.map((buck, index) => (
+        <Fragment key={buck.id}>
+          {index > 0 && ", "}
+          <GoatLink goat={buck} />
+        </Fragment>
+      ))
+    ) : (
+      <span className="text-copy-muted">No bucks on record</span>
+    );
+  const templateHeading = template
     ? `${template.label}${start ? ` — ${start.getFullYear()}` : ""}`
-    : bucksLabel;
+    : null;
   const suggestedBuckOut =
     season.end_date === null && template && start
       ? fmtDate(addMonths(start, template.length_months))
@@ -78,7 +87,7 @@ export function SeasonSummaryCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-medium text-copy-primary">
-            {heading}
+            {templateHeading ?? bucksNode}
             {season.end_date === null && (
               <span className="ml-2 rounded-lg bg-accent-dim px-2 py-0.5 text-xs text-brand">
                 Bucks in
@@ -86,7 +95,7 @@ export function SeasonSummaryCard({
             )}
           </p>
           <p className="text-xs text-copy-muted">
-            {template ? `${bucksLabel} · ` : ""}
+            {templateHeading ? <>{bucksNode} · </> : null}
             {fmtDate(season.start_date)} →{" "}
             {season.end_date ? fmtDate(season.end_date) : "still with the herd"}
             {barnName ? ` · ${barnName}` : ""}

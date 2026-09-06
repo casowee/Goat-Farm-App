@@ -19,6 +19,10 @@ import {
   HEALTH_RECORD_TYPE_LABELS,
   type HealthRecordType,
 } from "@/lib/health/records";
+import {
+  computeKidCountBreakdown,
+  type KidCountBreakdown,
+} from "@/lib/breeding/kid-count";
 
 /** How many of a doe's most recent health records to show for context. */
 export const RECENT_HEALTH_LIMIT = 5;
@@ -36,7 +40,19 @@ export interface DoePerformanceRow {
   lastKiddingAgoLabel: string | null;
   averageIntervalMonths: number | null;
   averageIntervalLabel: string | null;
-  kiddingEvents: { dateLabel: string; kidCount: number }[];
+  kiddingEvents: {
+    dateLabel: string;
+    kidCount: number;
+    /** The actual kids born that day — each links to its own detail page. */
+    kids: { id: number; tag: string; name: string | null; status: string }[];
+    /**
+     * `true` when the gap to the NEXT event is impossibly short — the inline
+     * "verify the correct mother" warning renders directly after this event.
+     */
+    tooCloseAfter: boolean;
+  }[];
+  /** Lifetime kid total + non-zero per-status split (goat-profile Breeding tab). */
+  kidSummary: KidCountBreakdown;
   healthRecords: {
     id: number;
     typeLabel: string;
@@ -112,10 +128,20 @@ export function toDoePerformanceRow(
       performance.averageIntervalMonths !== null
         ? formatAge(performance.averageIntervalMonths)
         : null,
-    kiddingEvents: performance.kiddingEvents.map((e) => ({
+    kiddingEvents: performance.kiddingEvents.map((e, i) => ({
       dateLabel: fmtDate(e.date),
       kidCount: e.kidCount,
+      kids: e.kids.map((k) => ({
+        id: k.id,
+        tag: k.tag,
+        name: k.name,
+        status: k.status,
+      })),
+      tooCloseAfter: performance.tooCloseAfter[i] ?? false,
     })),
+    kidSummary: computeKidCountBreakdown(
+      performance.kiddingEvents.flatMap((e) => e.kids),
+    ),
     healthRecords: healthRecords.slice(0, RECENT_HEALTH_LIMIT).map((h) => ({
       id: h.id,
       typeLabel:

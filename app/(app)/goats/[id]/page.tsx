@@ -96,17 +96,6 @@ export default async function GoatDetailPage({
     )
     .order("tag");
 
-  // UPD-010 — lifetime "Total kids" for a doe: every kid ever linked to her via
-  // dam_id, regardless of tag status (temp / promoted) or life status
-  // (active / sold / deceased / stolen). A direct RLS-scoped count — no herd fetch.
-  const { count: totalKids } =
-    goat.sex === "female"
-      ? await supabase
-          .from("goats")
-          .select("id", { count: "exact", head: true })
-          .eq("dam_id", goatId)
-      : { count: null };
-
   const goatsById = new Map<number, PedigreeGoatRow>(
     (allGoats ?? []).map((g) => [g.id, g]),
   );
@@ -231,11 +220,8 @@ export default async function GoatDetailPage({
             </div>
             {goat.sex === "female" && (
               <p className="text-xs text-copy-muted">
-                Total kids:{" "}
-                <span className="text-copy-secondary">{totalKids ?? 0}</span>{" "}
-                <span className="text-copy-muted">
-                  (every kid ever born to her)
-                </span>
+                Kidding history is in the{" "}
+                <span className="text-copy-secondary">Breeding</span> tab below.
               </p>
             )}
           </div>

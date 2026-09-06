@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { Fragment, useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ChevronDown, Loader2, Search } from "lucide-react";
+import { ChevronDown, Loader2, Search, TriangleAlert } from "lucide-react";
 import { addDoePerformanceNote } from "@/app/(app)/breeding/doe-performance/actions";
+import { GoatLink } from "@/components/goats/goat-link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,7 +53,32 @@ const FLAG_FILTER_OPTIONS: { value: DoePerformanceFlag | typeof ALL; label: stri
       value: "never_kidded_but_eligible",
       label: DOE_PERFORMANCE_FLAG_LABELS.never_kidded_but_eligible,
     },
+    {
+      value: "impossible_interval",
+      label: "Possible registration error",
+    },
   ];
+
+/**
+ * `impossible_interval` is a data-entry warning, not a performance flag — it
+ * gets a red / error treatment and its own wording, distinct from the amber
+ * "not performing well" chips.
+ */
+function FlagChip({ flag }: { flag: DoePerformanceFlag }) {
+  if (flag === "impossible_interval") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-lg bg-error/15 px-2 py-0.5 text-xs text-error">
+        <TriangleAlert className="h-3 w-3" />
+        Possible registration error
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-lg bg-warning/15 px-2 py-0.5 text-xs text-warning">
+      {DOE_PERFORMANCE_FLAG_LABELS[flag]}
+    </span>
+  );
+}
 
 function SaveNoteButton() {
   const { pending } = useFormStatus();
@@ -134,31 +160,26 @@ export function DoeCard({
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-surface-border p-4">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-start justify-between gap-3 text-left"
-      >
-        <div className="flex min-w-0 flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-copy-primary">
-              {row.doeLabel}
+      <div className="flex min-w-0 flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <GoatLink
+            goat={{ id: row.doeId, tag: row.tag, name: row.name }}
+            className="text-sm font-medium"
+          />
+          {row.flags.length > 0 ? (
+            row.flags.map((flag) => <FlagChip key={flag} flag={flag} />)
+          ) : (
+            <span className="rounded-lg bg-subtle px-2 py-0.5 text-xs text-success">
+              Not currently flagged
             </span>
-            {row.flags.length > 0 ? (
-              row.flags.map((flag) => (
-                <span
-                  key={flag}
-                  className="rounded-lg bg-warning/15 px-2 py-0.5 text-xs text-warning"
-                >
-                  {DOE_PERFORMANCE_FLAG_LABELS[flag]}
-                </span>
-              ))
-            ) : (
-              <span className="rounded-lg bg-subtle px-2 py-0.5 text-xs text-success">
-                Not currently flagged
-              </span>
-            )}
-          </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-start justify-between gap-3 text-left"
+          aria-expanded={open}
+        >
           <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-copy-muted">
             <div className="flex gap-1">
               <dt>Age:</dt>
@@ -186,13 +207,13 @@ export function DoeCard({
               </div>
             )}
           </dl>
-        </div>
-        <ChevronDown
-          className={`mt-1 h-4 w-4 shrink-0 text-copy-muted transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
-        />
-      </button>
+          <ChevronDown
+            className={`mt-1 h-4 w-4 shrink-0 text-copy-muted transition-transform ${
+              open ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+      </div>
 
       {open && (
         <div className="flex flex-col gap-4 border-t border-surface-border pt-3">
@@ -205,13 +226,37 @@ export function DoeCard({
             ) : (
               <ul className="flex flex-col gap-1">
                 {row.kiddingEvents.map((event, index) => (
-                  <li
-                    key={`${event.dateLabel}-${index}`}
-                    className="text-xs text-copy-secondary"
-                  >
-                    {event.dateLabel} —{" "}
-                    {event.kidCount === 1 ? "1 kid" : `${event.kidCount} kids`}
-                  </li>
+                  <Fragment key={`${event.dateLabel}-${index}`}>
+                    <li className="text-xs text-copy-secondary">
+                      {event.dateLabel} —{" "}
+                      {event.kidCount === 1
+                        ? "1 kid"
+                        : `${event.kidCount} kids`}
+                      {event.kids.length > 0 && (
+                        <span className="text-copy-muted">
+                          {" "}
+                          (
+                          {event.kids.map((kid, i) => (
+                            <Fragment key={kid.id}>
+                              {i > 0 && ", "}
+                              <GoatLink goat={kid} />
+                            </Fragment>
+                          ))}
+                          )
+                        </span>
+                      )}
+                    </li>
+                    {event.tooCloseAfter && (
+                      <li className="flex items-start gap-1.5 rounded-lg bg-error/15 px-2 py-1 text-xs text-error">
+                        <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span>
+                          Possible registration error — verify the correct
+                          mother. These two kiddings are closer together than a
+                          goat can physically kid.
+                        </span>
+                      </li>
+                    )}
+                  </Fragment>
                 ))}
               </ul>
             )}

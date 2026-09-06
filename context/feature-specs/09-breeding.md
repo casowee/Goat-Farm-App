@@ -41,6 +41,13 @@ gestation length, the app computes the expected **kidding window**.
   buck/doe counts already computed for the dashboard — informational, not a hard rule.
 - A **compact "current season" indicator on the main dashboard** — not the full timeline, just a small
   status line (e.g. "Season active — males in since 12 Mar" or "Off-season — next season ~September").
+- **A "Top Performers" tab on the Breeding page** (2026-09-06 amendment) — a ranked list of currently
+  active does by their lifetime kid count, descending. Informational; every row links to that doe's
+  detail page.
+- **Clickable goat references throughout Breeding** (2026-09-06 amendment) — every place a goat is named
+  in the Breeding area (the Seasons list's bucks, the Doe Performance list's does, the kids under each
+  kidding event, the Top Performers list) is a link to that goat's `/goats/[id]` page, rendered through
+  one shared `components/goats/goat-link.tsx` component.
 - **Male in/out reminders merged into the existing "Due soon" widget** (spec `12`/`UPD-006`) — this is an
   **in-app reminder**, appearing in the same list as vaccinations/deworming, not a real phone push
   notification. True OS-level push notifications would need a service worker and push subscription
@@ -415,6 +422,14 @@ components/breeding/season-timeline.tsx                        # compact vertica
 components/dashboard/breeding-status.tsx                       # small dashboard status line
 ```
 
+*(2026-09-06 amendment adds: `lib/breeding/kid-count.ts` [`kidsOfDam` + `computeKidCountBreakdown` — the
+one dam_id-based kid selector, shared by kidding events, the goat-profile total, and Top Performers],
+`lib/breeding/top-performers.ts` [`computeTopPerformingDoes`], `components/goats/goat-link.tsx` [the
+shared clickable goat reference], `components/breeding/top-performers-list.tsx`,
+`app/(app)/breeding/top-performers/page.tsx`. `lib/breeding/doe-performance.ts` gains an
+`impossible_interval` flag + `DEFAULT_MIN_KIDDING_INTERVAL_DAYS = 150`, reading
+`breeding_settings.gestation_days` opportunistically when spec 09 is set up.)*
+
 *(Also present from earlier build increments, not in the original list: `lib/breeding/settings.ts`
 [shared `BreedingSettings` shape + gestation ⇄ months/weeks], `lib/breeding/season.ts` [shared occurrence
 shape + date helpers], `lib/breeding/timeline.ts` [`computeSeasonalTimeline`, keeps the timeline widget
@@ -468,6 +483,15 @@ Click-through:
    with everything else.
 7. Dark theme, phone width, no console errors or hydration warnings.
 
+8. **Top Performers tab** ranks currently-active does by lifetime kid count, descending; every row (and
+   every buck in Seasons, every doe in Doe Performance, every kid under a kidding event) is a link that
+   opens the correct goat's detail page.
+9. **Impossible kidding interval** — a doe with two kidding events closer together than the minimum
+   realistic gap (spec 09's `gestation_days`, else 150 days) shows a distinct red "verify the correct
+   mother" warning: inline between the two events on her goat-profile Breeding tab, and as a distinctly
+   styled badge on her Doe Performance row alongside any genuine performance flags. Works even when spec
+   09's `breeding_settings` has no row yet (falls back to 150 without erroring).
+
 Owner-only: cross-account RLS on both new tables, same pattern as every prior table.
 
 ## 12. Roadmap & progress updates — the agent must do these
@@ -494,6 +518,43 @@ of `feature-specs-roadmap.md`, and update `progress-tracker.md` — note this is
   larger update, revisited only if in-app reminders prove insufficient in practice.
 
 ## 14. Implementation notes
+
+### 2026-09-06 — Top Performers tab, clickable goat references, impossible-interval flag (shared with `UPD-012`)
+
+An amendment touching both this spec and `UPD-012` (which was reopened to `in progress` for it). All
+changes are edits to existing code; nothing in this section replaces the earlier notes.
+
+- **`components/goats/goat-link.tsx`** (new) — the one reusable way to render a goat reference as a link
+  to `/goats/[id]`, showing the goat's tag. Now used by the Seasons list's bucks
+  (`components/breeding/season-summary-card.tsx`), the Doe Performance list's does and their kids
+  (`components/breeding/doe-performance-list.tsx`), and the new Top Performers list. Previously these
+  lists rendered bucks/does as plain non-clickable text.
+- **`lib/breeding/kid-count.ts`** (new) — `kidsOfDam(allGoats, damId)` is now the single dam_id-based kid
+  selector (it had been an inline count query on the goat detail page, UPD-010's "Total kids" stat).
+  `computeKidCountBreakdown(kids)` returns the lifetime total plus a non-zero-only per-status split
+  ("active" / "sold" / "died" / "stolen"). `computeKiddingEvents`, the goat-profile total, and
+  `computeTopPerformingDoes` all build on `kidsOfDam`.
+- **`lib/breeding/top-performers.ts`** (new) — `computeTopPerformingDoes(allGoats)` ranks active does by
+  lifetime kid count descending (ties by tag). `app/(app)/breeding/top-performers/page.tsx` +
+  `components/breeding/top-performers-list.tsx` render it as a third Breeding tab
+  (`components/breeding/breeding-tabs.tsx`). Does with zero kids are summarised, not listed.
+- **Goat-profile Breeding tab (doe)** — `KiddingEvent` now carries the actual `kids` born that day;
+  `DoeCard`'s kidding history lists each kid as a `GoatLink`. The goat-profile tab shows a large
+  prominent total-kids number (dashboard large-stat treatment) and a "Total: 6 · 4 active · 1 sold ·
+  1 died" status-breakdown line; the old "Total kids: N (every kid ever born to her)" header line and
+  its separate count query were removed.
+- **`impossible_interval` flag** — `lib/breeding/doe-performance.ts` gains a fourth flag, a
+  *data-integrity* flag distinct from the three performance flags. `computeDoePerformance` takes an
+  optional `minKiddingIntervalDays` (default `DEFAULT_MIN_KIDDING_INTERVAL_DAYS = 150`); callers resolve
+  it from `breeding_settings.gestation_days` when readable, falling back to 150 when spec 09 isn't set up
+  (read opportunistically, never hard-required). If any two consecutive kidding events are closer than
+  that, the flag is added and `tooCloseAfter[i]` marks the offending pair. Shown as a red "verify the
+  correct mother" warning inline between the two events (goat-profile tab) and as a distinct red badge on
+  the Doe Performance row, alongside any genuine performance flags.
+- `npm run build` + `npx tsc --noEmit` clean; `npm run lint` at project baseline. Pure logic
+  sanity-checked (kids grouped onto events with status; breakdown non-zero segments only; impossible
+  interval flagged at both the 150 default and a supplied 171; Top Performers ranked descending;
+  never-kidded / too-young / on-rhythm cases unchanged).
 
 ### 2026-09-05 — goat-profile Breeding tab wired up (shared with `UPD-012`)
 

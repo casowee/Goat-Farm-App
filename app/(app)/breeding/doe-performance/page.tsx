@@ -8,6 +8,7 @@ import { DoePerformanceList } from "@/components/breeding/doe-performance-list";
 import {
   computeDoePerformance,
   DEFAULT_DOE_PERFORMANCE_SETTINGS,
+  DEFAULT_MIN_KIDDING_INTERVAL_DAYS,
   type DoePerformance,
   type DoePerformanceGoat,
   type DoePerformanceSettings,
@@ -23,22 +24,33 @@ export default async function DoePerformancePage() {
   const now = new Date();
 
   // RLS scopes every query to the signed-in owner.
-  const [{ data: settingsRow }, { data: goats }, { data: noteRows }] =
-    await Promise.all([
-      supabase
-        .from("doe_performance_settings")
-        .select("max_expected_interval_months, breeding_eligible_age_months")
-        .maybeSingle(),
-      supabase
-        .from("goats")
-        .select(
-          "id, tag, name, sex, reproductive_state, date_of_birth, status, dam_id",
-        ),
-      supabase
-        .from("doe_performance_notes")
-        .select("id, doe_id, category, note, created_at")
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: settingsRow },
+    { data: goats },
+    { data: noteRows },
+    { data: breedingSettingsRow },
+  ] = await Promise.all([
+    supabase
+      .from("doe_performance_settings")
+      .select("max_expected_interval_months, breeding_eligible_age_months")
+      .maybeSingle(),
+    supabase
+      .from("goats")
+      .select(
+        "id, tag, name, sex, reproductive_state, date_of_birth, status, dam_id",
+      ),
+    supabase
+      .from("doe_performance_notes")
+      .select("id, doe_id, category, note, created_at")
+      .order("created_at", { ascending: false }),
+    // Spec 09's gestation length is the minimum realistic kidding interval for
+    // the impossible-interval data-integrity flag. Read opportunistically — if
+    // spec 09 isn't set up yet, fall back to the default (~5 months).
+    supabase.from("breeding_settings").select("gestation_days").maybeSingle(),
+  ]);
+
+  const minKiddingIntervalDays =
+    breedingSettingsRow?.gestation_days ?? DEFAULT_MIN_KIDDING_INTERVAL_DAYS;
 
   const settings: DoePerformanceSettings = settingsRow
     ? {
@@ -53,7 +65,9 @@ export default async function DoePerformancePage() {
   // kidded yet returns null from computeDoePerformance and is dropped here).
   const flagged: DoePerformance[] = allGoats
     .filter((g) => g.sex === "female" && g.status === "active")
-    .map((g) => computeDoePerformance(g, allGoats, settings, now))
+    .map((g) =>
+      computeDoePerformance(g, allGoats, settings, now, minKiddingIntervalDays),
+    )
     .filter((p): p is DoePerformance => p !== null && p.flags.length > 0);
 
   const goatById = new Map(allGoats.map((g) => [g.id, g]));
@@ -111,7 +125,8 @@ export default async function DoePerformancePage() {
           </Link>
           ) but never have. Flags are worked out live from your settings; the
           app does not decide the cause — you record your own conclusion per
-          doe.
+          doe. A doe whose kidding dates are impossibly close together is also
+          shown here with a separate data-entry warning.
         </p>
       </div>
 

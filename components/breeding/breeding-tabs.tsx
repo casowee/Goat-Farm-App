@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const BREEDING_TABS = [
   { href: "/breeding", label: "Seasons" },
   { href: "/breeding/doe-performance", label: "Doe Performance" },
+  { href: "/breeding/top-performers", label: "Top Performers" },
 ] as const;
 
 export function BreedingTabs() {

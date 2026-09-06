@@ -12,6 +12,7 @@
 
 import { ageInMonths } from "@/lib/goats/stage";
 import type { GoatSex, ReproductiveState } from "@/lib/goats/stage";
+import { kidsOfDam } from "@/lib/breeding/kid-count";
 
 /**
  * Kids whose birth dates fall within this many days of a cluster's anchor
@@ -21,6 +22,17 @@ import type { GoatSex, ReproductiveState } from "@/lib/goats/stage";
  * 2026-09-05 (spec §14); kept in one place for easy retuning.
  */
 export const KIDDING_EVENT_GROUPING_DAYS = 3;
+
+/**
+ * When spec 09's `breeding_settings.gestation_days` is unavailable, this is the
+ * minimum realistic gap between two kiddings (~5 months). Two of a doe's kidding
+ * events closer together than this are almost certainly a data-entry mistake —
+ * a kid registered under the wrong mother — not a real biological event, so it
+ * is flagged as `impossible_interval` (a data-integrity flag, distinct from the
+ * performance flags). Read spec 09's real gestation length opportunistically;
+ * fall back here if that table/row isn't set up yet.
+ */
+export const DEFAULT_MIN_KIDDING_INTERVAL_DAYS = 150;
 
 /** Average number of days per month used for the interval-in-months maths. */
 const AVERAGE_DAYS_PER_MONTH = 30.44;
@@ -39,23 +51,49 @@ export interface DoePerformanceGoat {
   dam_id: number | null;
 }
 
+/** One kid born in a kidding event — enough to link to its own detail page. */
+export interface KiddingEventKid {
+  id: number;
+  tag: string;
+  name: string | null;
+  /** `goat_status`. */
+  status: string;
+}
+
 export interface KiddingEvent {
   /** The earliest kid birth date in the cluster (local midnight). */
   date: Date;
-  /** How many kids were born in this event. */
+  /** How many kids were born in this event (= `kids.length`). */
   kidCount: number;
+  /** The actual kids born that day — twins/triplets are all listed. */
+  kids: KiddingEventKid[];
 }
 
 export type DoePerformanceFlag =
   | "overdue"
   | "long_average_interval"
-  | "never_kidded_but_eligible";
+  | "never_kidded_but_eligible"
+  | "impossible_interval";
 
 export const DOE_PERFORMANCE_FLAG_LABELS: Record<DoePerformanceFlag, string> = {
   overdue: "Overdue since last kidding",
   long_average_interval: "Long average interval",
   never_kidded_but_eligible: "Never kidded (old enough)",
+  impossible_interval: "Possible registration error",
 };
+
+/**
+ * `impossible_interval` is a DATA-INTEGRITY flag, not a performance one: it
+ * means "this looks like a data-entry mistake — probably a kid recorded under
+ * the wrong mother", not "this doe is not performing well". The UI styles and
+ * words it distinctly (a red / warning treatment, "verify the correct mother"),
+ * separate from the amber "not performing well" flags.
+ */
+export const DOE_PERFORMANCE_PERFORMANCE_FLAGS: DoePerformanceFlag[] = [
+  "overdue",
+  "long_average_interval",
+  "never_kidded_but_eligible",
+];
 
 export interface DoePerformance {
   doeId: number;
@@ -68,8 +106,20 @@ export interface DoePerformance {
   monthsSinceLastKidding: number | null;
   /** Mean gap between consecutive kiddings, 1 dp; null if fewer than 2 events. */
   averageIntervalMonths: number | null;
-  /** Every flag that applies. A doe with any flag is "not performing well". */
+  /**
+   * Every flag that applies. `overdue` / `long_average_interval` /
+   * `never_kidded_but_eligible` mean "not performing well"; `impossible_interval`
+   * means "probably a data-entry mistake" and is styled separately by the UI.
+   */
   flags: DoePerformanceFlag[];
+  /**
+   * `tooCloseAfter[i]` is `true` when the gap between kidding event `i` and
+   * event `i + 1` is below the minimum realistic interval — the pair that
+   * triggered `impossible_interval`. Length is `kiddingEvents.length - 1`
+   * (empty for a doe with fewer than two events). Used to place the inline
+   * "verify the correct mother" warning between exactly those two events.
+   */
+  tooCloseAfter: boolean[];
 }
 
 export interface DoePerformanceSettings {
@@ -110,26 +160,37 @@ export function computeKiddingEvents(
   allGoats: DoePerformanceGoat[],
   damId: number,
 ): KiddingEvent[] {
-  const kidDays: number[] = [];
-  for (const goat of allGoats) {
-    if (goat.dam_id !== damId) continue;
+  // `kidsOfDam` is the single dam_id-based selector (lib/breeding/kid-count.ts).
+  const kids: { kid: KiddingEventKid; day: number }[] = [];
+  for (const goat of kidsOfDam(allGoats, damId)) {
     const day = toDayNumber(goat.date_of_birth);
-    if (day !== null) kidDays.push(day);
+    if (day === null) continue;
+    kids.push({
+      kid: {
+        id: goat.id,
+        tag: goat.tag,
+        name: goat.name,
+        status: goat.status,
+      },
+      day,
+    });
   }
-  kidDays.sort((a, b) => a - b);
+  kids.sort((a, b) => a.day - b.day);
 
   const events: KiddingEvent[] = [];
   let anchorDay: number | null = null;
-  for (const day of kidDays) {
+  for (const { kid, day } of kids) {
     if (
       anchorDay !== null &&
       events.length > 0 &&
       day - anchorDay <= KIDDING_EVENT_GROUPING_DAYS
     ) {
-      events[events.length - 1].kidCount += 1;
+      const current = events[events.length - 1];
+      current.kidCount += 1;
+      current.kids.push(kid);
       continue;
     }
-    events.push({ date: dayNumberToDate(day), kidCount: 1 });
+    events.push({ date: dayNumberToDate(day), kidCount: 1, kids: [kid] });
     anchorDay = day;
   }
   return events;
@@ -146,6 +207,14 @@ export function computeDoePerformance(
   allGoats: DoePerformanceGoat[],
   settings: DoePerformanceSettings,
   now: Date,
+  /**
+   * Minimum realistic gap between two kiddings, in days. The caller resolves
+   * this from spec 09's `breeding_settings.gestation_days` when that table/row
+   * is readable, otherwise passes nothing and this defaults to
+   * `DEFAULT_MIN_KIDDING_INTERVAL_DAYS`. Spec 09 is read opportunistically —
+   * never hard-required.
+   */
+  minKiddingIntervalDays: number = DEFAULT_MIN_KIDDING_INTERVAL_DAYS,
 ): DoePerformance | null {
   // Raw age from date_of_birth — NOT the derived Kid/Doeling/Doe stage label.
   // "Breeding-eligible age" and "life stage" are two independent, separately
@@ -157,6 +226,21 @@ export function computeDoePerformance(
     doe.tag?.trim() || doe.name?.trim() || `Goat #${doe.id}`;
 
   const flags: DoePerformanceFlag[] = [];
+
+  // Data-integrity check: any two consecutive kidding events closer together
+  // than a goat can physically kid → probably a kid recorded under the wrong
+  // mother. Independent of the performance flags below.
+  const tooCloseAfter: boolean[] = [];
+  for (let i = 0; i < kiddingEvents.length - 1; i += 1) {
+    const gapDays =
+      (kiddingEvents[i + 1].date.getTime() - kiddingEvents[i].date.getTime()) /
+      86_400_000;
+    const tooClose = gapDays < minKiddingIntervalDays;
+    tooCloseAfter.push(tooClose);
+    if (tooClose && !flags.includes("impossible_interval")) {
+      flags.push("impossible_interval");
+    }
+  }
 
   if (kiddingEvents.length === 0) {
     if (ageMonths < settings.breedingEligibleAgeMonths) {
@@ -171,6 +255,7 @@ export function computeDoePerformance(
       monthsSinceLastKidding: null,
       averageIntervalMonths: null,
       flags,
+      tooCloseAfter,
     };
   }
 
@@ -200,6 +285,7 @@ export function computeDoePerformance(
     monthsSinceLastKidding,
     averageIntervalMonths,
     flags,
+    tooCloseAfter,
   };
 }
 

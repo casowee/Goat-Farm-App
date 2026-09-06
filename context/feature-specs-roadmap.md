@@ -256,6 +256,14 @@ through `eligibleBreedingMales` — Kids are never shown, Bucklings sit behind a
 >
 > **Cross-account RLS on `breeding_settings` and `breeding_season_occurrences` still needs the owner's
 > second-account confirmation** as it ships (standing rule for new owner-scoped tables).
+>
+> **Amendment 2026-09-06 (shared with `UPD-012`):** a **"Top Performers" third Breeding tab** (active
+> does ranked by lifetime kid count), one shared `components/goats/goat-link.tsx` making every goat
+> reference in Breeding (Seasons bucks, Doe Performance does, kids under each kidding event) a link to
+> `/goats/[id]`, and an `impossible_interval` data-integrity flag in `lib/breeding/doe-performance.ts`
+> (reads `breeding_settings.gestation_days` opportunistically, falls back to 150 days). No migration.
+> `UPD-012` was reopened to `in progress` for this. Build + tsc clean, lint at baseline; awaiting the
+> owner's hands-on test with the rest of 09's pending checklist.
 
 ---
 
@@ -392,8 +400,18 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > applied as zero-risk hardening rather than a confirmed-bug fix. Full detail in the spec's own dated
 > Amendment and `progress-tracker.md`.
 
-> 🐐 **`UPD-012` (Doe Reproductive Performance Tracking) — `done`, built + owner-tested 2026-09-05,
-> including the goat-profile Breeding tab integration (owner-confirmed the same day).**
+> 🐐 **`UPD-012` (Doe Reproductive Performance Tracking) — `in progress`, reopened 2026-09-06.**
+> Built + owner-tested 2026-09-05 (core feature + goat-profile Breeding tab), then **reopened for
+> Amendment 3, a shared amendment with Feature 09**: kids listed (as links) under each kidding event, a
+> prominent total-kids number + "Total: 6 · 4 active · 1 sold · 1 died" status breakdown on the
+> goat-profile Breeding tab (the old "Total kids" header line + its count query removed), and a new
+> `impossible_interval` data-integrity flag (a doe with two kidding events closer than
+> `breeding_settings.gestation_days`, else 150 days — read opportunistically, spec 09 not required)
+> shown as a distinct red "verify the correct mother" warning inline on her goat-profile tab and as a
+> badge on her Doe Performance row. Also new: a **"Top Performers" third tab** on the Breeding page
+> ranking active does by lifetime kid count, and one shared `components/goats/goat-link.tsx` making
+> every goat reference in Breeding clickable. **No migration.** Build + tsc clean, lint at baseline;
+> not `done` until owner-tested alongside Feature 09's pending checklist.
 > `context/update-specs/012-doe-performance-tracking.md`.
 > Reads only
 > already-shipped goat / lineage data (05, 06 `dam_id`) + health records (07, read-only) — **does not
@@ -428,8 +446,19 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > extracted to `components/breeding/season-summary-card.tsx`, now used by both, breeding page passes
 > edit/delete through an `actions` slot); a **wether** → "Not applicable"; a **young/too-young goat** →
 > a non-alarming empty state. New `components/goats/goat-breeding-tab.tsx`. Owner-confirmed working
-> 2026-09-05 → `UPD-012` `done`; `09` stays `in progress` on its own separate breeding-seasons test.
+> 2026-09-05 → `UPD-012` was `done`; `09` stays `in progress` on its own separate breeding-seasons test.
 > Build + tsc clean, lint at baseline.
+>
+> **Amendment 3 (2026-09-06) — reopened `UPD-012` to `in progress`.** Shared with Feature 09. Kids
+> listed as links under each kidding event (`KiddingEvent.kids` + shared `components/goats/goat-link.tsx`),
+> a prominent total-kids number + "Total: X · Y active · Z died" status breakdown on the goat-profile
+> Breeding tab (old "Total kids" header line + count query removed; new
+> `lib/breeding/kid-count.ts` = `kidsOfDam` + `computeKidCountBreakdown`), a new `impossible_interval`
+> data-integrity flag in `lib/breeding/doe-performance.ts` (min gap = `breeding_settings.gestation_days`
+> read opportunistically, else `DEFAULT_MIN_KIDDING_INTERVAL_DAYS = 150`), shown red + distinct inline
+> on the goat-profile tab and as a badge on the Doe Performance row. Plus the new "Top Performers"
+> Breeding tab. No migration. Build + tsc clean, lint at baseline; not `done` until owner-tested with
+> 09's checklist.
 
 **Task 1 result (2026-08-29):** confirmed from the generated types that spec 07 built health records as
 **one `health_records` table with a `record_type` enum + a `next_due_date` column** — not the separate

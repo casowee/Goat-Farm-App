@@ -9,6 +9,7 @@ import {
 import {
   computeDoePerformance,
   DEFAULT_DOE_PERFORMANCE_SETTINGS,
+  DEFAULT_MIN_KIDDING_INTERVAL_DAYS,
   type DoePerformanceGoat,
   type DoePerformanceSettings,
 } from "@/lib/breeding/doe-performance";
@@ -161,23 +162,30 @@ export async function loadGoatBreedingTabData(
   }
 
   // Doe.
-  const [{ data: settingsRow }, { data: allGoats }, { data: noteRows }] =
-    await Promise.all([
-      supabase
-        .from("doe_performance_settings")
-        .select("max_expected_interval_months, breeding_eligible_age_months")
-        .maybeSingle(),
-      supabase
-        .from("goats")
-        .select(
-          "id, tag, name, sex, reproductive_state, date_of_birth, status, dam_id",
-        ),
-      supabase
-        .from("doe_performance_notes")
-        .select("id, category, note, created_at")
-        .eq("doe_id", goat.id)
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: settingsRow },
+    { data: allGoats },
+    { data: noteRows },
+    { data: breedingSettingsRow },
+  ] = await Promise.all([
+    supabase
+      .from("doe_performance_settings")
+      .select("max_expected_interval_months, breeding_eligible_age_months")
+      .maybeSingle(),
+    supabase
+      .from("goats")
+      .select(
+        "id, tag, name, sex, reproductive_state, date_of_birth, status, dam_id",
+      ),
+    supabase
+      .from("doe_performance_notes")
+      .select("id, category, note, created_at")
+      .eq("doe_id", goat.id)
+      .order("created_at", { ascending: false }),
+    // Spec 09's gestation length drives the impossible-kidding-interval flag.
+    // Read opportunistically — fall back to the default if 09 isn't set up.
+    supabase.from("breeding_settings").select("gestation_days").maybeSingle(),
+  ]);
 
   const settings: DoePerformanceSettings = settingsRow
     ? {
@@ -198,7 +206,16 @@ export async function loadGoatBreedingTabData(
     dam_id: null,
   };
 
-  const performance = computeDoePerformance(thisDoe, herd, settings, new Date());
+  const minKiddingIntervalDays =
+    breedingSettingsRow?.gestation_days ?? DEFAULT_MIN_KIDDING_INTERVAL_DAYS;
+
+  const performance = computeDoePerformance(
+    thisDoe,
+    herd,
+    settings,
+    new Date(),
+    minKiddingIntervalDays,
+  );
 
   if (!performance) {
     return {
@@ -290,6 +307,20 @@ export function GoatBreedingTab({ data }: { data: GoatBreedingTabData }) {
 
   return (
     <TabCard title="Kidding performance">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-3xl font-semibold tabular-nums text-copy-primary">
+          {data.row.kidSummary.total}
+        </span>
+        <span className="text-xs text-copy-muted">total kids</span>
+        {data.row.kidSummary.total > 0 && (
+          <p className="mt-1 text-sm text-copy-secondary">
+            Total: {data.row.kidSummary.total}
+            {data.row.kidSummary.byStatus.map(
+              (segment) => ` · ${segment.count} ${segment.label}`,
+            )}
+          </p>
+        )}
+      </div>
       <DoeCard row={data.row} defaultOpen />
       {data.showCrossLink && (
         <p className="text-xs text-copy-muted">

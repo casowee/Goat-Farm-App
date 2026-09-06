@@ -4,7 +4,7 @@
 | ----------------- | ------------------------------------------------------------------ |
 | ID                | `UPD-012`                                                          |
 | Title             | Flag underperforming does (overdue, long interval, never-kidded) + owner-recorded investigation notes |
-| Status            | `done` — core feature built + owner-tested 2026-09-05; goat-profile Breeding tab integration added and owner-confirmed working 2026-09-05 (migrations `20260905000005` + `20260905000006` applied) |
+| Status            | `in progress` — core feature + goat-profile Breeding tab were built and owner-tested 2026-09-05, but **reopened 2026-09-06** for a shared amendment with Feature 09 (kids listed under each kidding event, a prominent total-kids number + status breakdown on the goat-profile tab, and a new `impossible_interval` data-integrity flag). Not `done` until the owner tests the amendment alongside Feature 09's own pending checklist. Migrations `20260905000005` + `20260905000006` applied; the amendment adds **no** migration. |
 | Owner approved?   | yes                                                              |
 | Feature spec(s)   | `05-goat-profiles`, `06-family-tree` (dam linkage), `07-health-records` (correlation view) |
 | Depends on        | `05`, `06` (done); `07` (health records, reused for context — does not require `07` to be formally "done," just its table to exist). **Does NOT depend on `09`** — this reads only already-shipped goat/lineage data. |
@@ -305,6 +305,38 @@ re-checked (durations all `formatAge`-formatted, health/notes mapped, too-young 
 confirmed the goat-profile Breeding tab working 2026-09-05 — `UPD-012` is `done`. (Feature `09` stays
 `in progress` on its own separate pending checklist, unrelated to this integration.)
 
+### Amendment 3 — 2026-09-06 (shared with Feature `09`; spec reopened to `in progress`)
+
+An amendment touching both this spec and `context/feature-specs/09-breeding.md`. All changes are edits
+to existing code — nothing above is overwritten. **No migration.**
+
+1. **Kids listed under each kidding event.** `KiddingEvent` (`lib/breeding/doe-performance.ts`) now
+   carries the actual `kids` born that day (twins/triplets all listed). `computeKiddingEvents` collects
+   them via the new shared `kidsOfDam` selector. `DoePerformanceRow.kiddingEvents[i].kids` carries them
+   to the UI; `DoeCard`'s kidding history renders each kid as a `GoatLink` (new
+   `components/goats/goat-link.tsx`) linking to that kid's own `/goats/[id]` page. The doe's own label
+   and every buck/doe reference elsewhere in Breeding use the same `GoatLink`.
+2. **Prominent total + status breakdown on the goat-profile Breeding tab.** `components/goats/
+   goat-breeding-tab.tsx` (doe branch) shows a large total-kids number in the dashboard large-stat
+   style, then a "Total: 6 · 4 active · 1 sold · 1 died" line (non-zero status segments only) built from
+   the new `computeKidCountBreakdown` (`lib/breeding/kid-count.ts`) over the same kid list — not a second
+   query. The goat detail page's old always-visible "Total kids: N (every kid ever born to her)" header
+   line and its separate `count` query were removed; the header now points to the Breeding tab.
+3. **New `impossible_interval` data-integrity flag.** `computeDoePerformance` gains an optional
+   `minKiddingIntervalDays` (default `DEFAULT_MIN_KIDDING_INTERVAL_DAYS = 150`); the Doe Performance page
+   and the goat-profile tab resolve it from spec 09's `breeding_settings.gestation_days` when that row
+   is readable, else 150 — read opportunistically, spec 09 is never hard-required. If any two of a doe's
+   consecutive kidding events are closer than that, `impossible_interval` is added to `flags` (separate
+   from the three performance flags) and `tooCloseAfter[i]` marks the pair. It renders **distinctly**
+   (red, `TriangleAlert`, "Possible registration error — verify the correct mother"): inline between the
+   two offending events on the goat-profile tab, and as a red badge on the doe's Doe Performance row
+   alongside any genuine performance flags. The Doe Performance flag filter gains the option.
+4. `npm run build` + `npx tsc --noEmit` clean; `npm run lint` at project baseline. Pure logic
+   sanity-checked with a throw-away script (kids grouped onto events with status; breakdown shows only
+   non-zero segments; a 60-day gap flags `impossible_interval` at both the 150 default and a supplied
+   171-day gestation; a doe with the flag also keeps her real `overdue`/etc flags; Top Performers ranks
+   active does descending by lifetime kid count; on-rhythm / never-kidded / too-young cases unchanged).
+
 ## 12. Verification evidence
 
 **Automatic (agent):**
@@ -340,8 +372,11 @@ policy shape and no novel access pattern.
 
 ## 13. Resolution / final state
 
-`UPD-012` is **`done`** — core feature built and owner-tested 2026-09-05, and the goat-profile
-Breeding-tab integration (Amendment 2) confirmed working by the owner the same day.
+**Reopened to `in progress` on 2026-09-06** for Amendment 3 (shared with Feature 09) — the core feature
+and the goat-profile Breeding tab were owner-tested and working on 2026-09-05, but the amendment's new
+behaviour (kids under each kidding event, the prominent total + status breakdown, the
+`impossible_interval` flag) has not yet been hands-on tested by the owner. It returns to `done` once the
+owner confirms Amendment 3 works, tested alongside Feature 09's own pending breeding-seasons checklist.
 
 Doe reproductive performance tracking ships as a **tab inside the Breeding page** (`/breeding` "Seasons"
 · `/breeding/doe-performance` "Doe Performance", route-backed strip in
