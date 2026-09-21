@@ -7,6 +7,20 @@ export const GOAT_BREEDS = [
 ] as const;
 export type GoatBreed = (typeof GOAT_BREEDS)[number];
 
+// Sentinel values for the breed `Select` used by the goat form (UPD-002) and
+// the UPD-013 litter-mate quick-add form — shared so both pickers stay in
+// sync with the same "Crossed…" / "Other…" options and item lists.
+export const OTHER_BREED = "__other__";
+export const CROSSED_BREED = "__crossed__";
+
+export const BREED_SELECT_ITEMS = [
+  ...GOAT_BREEDS.map((b) => ({ label: b, value: b })),
+  { label: "Crossed…", value: CROSSED_BREED },
+  { label: "Other…", value: OTHER_BREED },
+];
+
+export const PURE_BREED_ITEMS = GOAT_BREEDS.map((b) => ({ label: b, value: b }));
+
 // Breed is a composition: one row per breed component of a goat, percentages
 // summing to 100. Feature 06 (6b) replaced the old two-column model
 // (primary + secondary + one percentage) with this list so that a born-here

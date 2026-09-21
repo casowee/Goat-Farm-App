@@ -2,8 +2,8 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { Loader2 } from "lucide-react";
 import { login } from "./actions";
+import { GoatSpinner } from "@/components/loading/goat-spinner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,7 +19,9 @@ function SubmitButton() {
 
   return (
     <Button type="submit" size="lg" className="w-full" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+      {pending && (
+        <GoatSpinner size="sm" label="Signing in…" className="text-primary-foreground" />
+      )}
       {pending ? "Signing in..." : "Sign in"}
     </Button>
   );

@@ -2,7 +2,8 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { GoatSpinner } from "@/components/loading/goat-spinner";
 import {
   createHealthRecord,
   updateHealthRecord,
@@ -75,7 +76,9 @@ function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+      {pending && (
+        <GoatSpinner size="sm" label="Saving…" className="text-primary-foreground" />
+      )}
       {pending ? "Saving..." : label}
     </Button>
   );

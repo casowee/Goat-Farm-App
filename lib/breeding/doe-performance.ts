@@ -197,6 +197,91 @@ export function computeKiddingEvents(
 }
 
 /**
+ * UPD-014 — plain-language litter size, for a single kidding event's kid count.
+ * "1 kid" reads as "Single" rather than a bare number; anything past
+ * Quadruplets (rare) falls back to "N kids" rather than inventing more names.
+ */
+export function labelLitterSize(kidCount: number): string {
+  switch (kidCount) {
+    case 1:
+      return "Single";
+    case 2:
+      return "Twins";
+    case 3:
+      return "Triplets";
+    case 4:
+      return "Quadruplets";
+    default:
+      return `${kidCount} kids`;
+  }
+}
+
+export interface DoeLitterStats {
+  /** Mean kids per kidding event, 1 dp (e.g. 1.8). */
+  averageLitterSize: number;
+  /** Keyed by `labelLitterSize()`'s output, e.g. { Single: 3, Twins: 2, Triplets: 1 }. */
+  countsByLabel: Record<string, number>;
+}
+
+// Canonical display order for the four named sizes; any "N kids" fallback
+// label sorts after them, by ascending N (see `formatLitterSizeBreakdown`).
+const NAMED_LITTER_SIZE_ORDER = ["Single", "Twins", "Triplets", "Quadruplets"];
+
+/**
+ * A doe's litter-size pattern — her average litter size and a breakdown of how
+ * many events fell into each size category. `null` when she has no kidding
+ * events yet (nothing to summarize) — the UI shows nothing in that case.
+ */
+export function computeDoeLitterStats(
+  events: KiddingEvent[],
+): DoeLitterStats | null {
+  if (events.length === 0) return null;
+
+  const totalKids = events.reduce((sum, e) => sum + e.kidCount, 0);
+  const averageLitterSize = Math.round((totalKids / events.length) * 10) / 10;
+
+  const countsByLabel: Record<string, number> = {};
+  for (const event of events) {
+    const label = labelLitterSize(event.kidCount);
+    countsByLabel[label] = (countsByLabel[label] ?? 0) + 1;
+  }
+
+  return { averageLitterSize, countsByLabel };
+}
+
+// The word for ONE event of this size ("1 triplet"), vs. several ("2 triplets").
+// "Single" is the odd one out — it's an adjective, not already a plural noun —
+// so it needs an "s" added rather than removed.
+function pluralizeLitterSizeLabel(label: string, eventCount: number): string {
+  if (label === "Single") return eventCount === 1 ? "single" : "singles";
+  if (NAMED_LITTER_SIZE_ORDER.includes(label)) {
+    const plural = label.toLowerCase();
+    return eventCount === 1 ? plural.replace(/s$/, "") : plural;
+  }
+  // "N kids" fallback (5+) — already count-agnostic wording.
+  return eventCount === 1 ? `litter of ${label}` : `litters of ${label}`;
+}
+
+/**
+ * The short breakdown line, e.g. "3 singles · 2 twins · 1 triplet" — only the
+ * categories a doe has actually had, in a stable Single→Twins→Triplets→
+ * Quadruplets→(5+, ascending) order.
+ */
+export function formatLitterSizeBreakdown(stats: DoeLitterStats): string {
+  const fallbackLabels = Object.keys(stats.countsByLabel)
+    .filter((label) => !NAMED_LITTER_SIZE_ORDER.includes(label))
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+
+  return [...NAMED_LITTER_SIZE_ORDER, ...fallbackLabels]
+    .filter((label) => (stats.countsByLabel[label] ?? 0) > 0)
+    .map((label) => {
+      const count = stats.countsByLabel[label];
+      return `${count} ${pluralizeLitterSizeLabel(label, count)}`;
+    })
+    .join(" · ");
+}
+
+/**
  * The live performance picture for one doe. Returns `null` when she cannot be
  * judged yet — zero kiddings AND below breeding-eligible age (spec §6). A doe
  * that CAN be judged always returns an object; `flags` is empty when she is

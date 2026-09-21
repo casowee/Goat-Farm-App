@@ -73,6 +73,21 @@
     background-color: var(--bg-base);
 }
 
+/* UPD-015 — GoatSpinner's hop loop. Transform-only (translateY), GPU-cheap. */
+@keyframes goat-bounce {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-18%);
+    }
+}
+
+@utility animate-goat-bounce {
+    animation: goat-bounce 0.9s ease-in-out infinite;
+}
+
 :root {
     /* Desert palette (dark theme only, see context/ui-context.md) */
     --bg-base: #0b0a09;

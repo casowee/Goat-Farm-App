@@ -10,7 +10,11 @@
 
 import { formatAge } from "@/lib/goats/age";
 import {
+  computeDoeLitterStats,
+  formatLitterSizeBreakdown,
+  labelLitterSize,
   DOE_PERFORMANCE_CATEGORY_LABELS,
+  type DoeLitterStats,
   type DoePerformance,
   type DoePerformanceCategory,
   type DoePerformanceFlag,
@@ -43,6 +47,8 @@ export interface DoePerformanceRow {
   kiddingEvents: {
     dateLabel: string;
     kidCount: number;
+    /** UPD-014 — e.g. "Single" / "Twins" / "Triplets" / "5 kids". */
+    litterSizeLabel: string;
     /** The actual kids born that day — each links to its own detail page. */
     kids: { id: number; tag: string; name: string | null; status: string }[];
     /**
@@ -53,6 +59,13 @@ export interface DoePerformanceRow {
   }[];
   /** Lifetime kid total + non-zero per-status split (goat-profile Breeding tab). */
   kidSummary: KidCountBreakdown;
+  /**
+   * UPD-014 — her litter-size pattern (average + a non-zero-only breakdown),
+   * `null` when she has no kidding events yet. `litterSizeBreakdownLabel` is
+   * the pre-formatted "3 singles · 2 twins · 1 triplet" line.
+   */
+  litterStats: DoeLitterStats | null;
+  litterSizeBreakdownLabel: string | null;
   healthRecords: {
     id: number;
     typeLabel: string;
@@ -109,6 +122,8 @@ export function toDoePerformanceRow(
       ? performance.kiddingEvents[performance.kiddingEvents.length - 1]
       : null;
 
+  const litterStats = computeDoeLitterStats(performance.kiddingEvents);
+
   return {
     doeId: performance.doeId,
     doeLabel: performance.doeLabel,
@@ -131,6 +146,7 @@ export function toDoePerformanceRow(
     kiddingEvents: performance.kiddingEvents.map((e, i) => ({
       dateLabel: fmtDate(e.date),
       kidCount: e.kidCount,
+      litterSizeLabel: labelLitterSize(e.kidCount),
       kids: e.kids.map((k) => ({
         id: k.id,
         tag: k.tag,
@@ -142,6 +158,10 @@ export function toDoePerformanceRow(
     kidSummary: computeKidCountBreakdown(
       performance.kiddingEvents.flatMap((e) => e.kids),
     ),
+    litterStats,
+    litterSizeBreakdownLabel: litterStats
+      ? formatLitterSizeBreakdown(litterStats)
+      : null,
     healthRecords: healthRecords.slice(0, RECENT_HEALTH_LIMIT).map((h) => ({
       id: h.id,
       typeLabel:

@@ -2,7 +2,8 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { GoatSpinner } from "@/components/loading/goat-spinner";
 import { createGoat, updateGoat } from "@/app/(app)/goats/actions";
 import {
   Dialog,
@@ -33,6 +34,10 @@ import type { Database } from "@/types/database.types";
 import type { GoatSex } from "@/lib/goats/stage";
 import {
   GOAT_BREEDS,
+  BREED_SELECT_ITEMS,
+  PURE_BREED_ITEMS,
+  OTHER_BREED,
+  CROSSED_BREED,
   type BreedComposition,
   composeFromParents,
   crossOfPureBreeds,
@@ -43,22 +48,12 @@ import {
   type ParentPickerGoat,
   type ParentSelection,
 } from "@/components/goats/parent-picker";
+import { LitterMateQuickAddForm } from "@/components/goats/litter-mate-quick-add-form";
 import { findTagMatches } from "@/lib/goats/tag";
 import { generateTempTag } from "@/lib/goats/temp-tag";
 
 type Goat = Database["public"]["Tables"]["goats"]["Row"];
 type GoatOrigin = Database["public"]["Enums"]["goat_origin"];
-
-const OTHER_BREED = "__other__";
-const CROSSED_BREED = "__crossed__";
-
-const BREED_SELECT_ITEMS = [
-  ...GOAT_BREEDS.map((b) => ({ label: b, value: b })),
-  { label: "Crossed…", value: CROSSED_BREED },
-  { label: "Other…", value: OTHER_BREED },
-];
-
-const PURE_BREED_ITEMS = GOAT_BREEDS.map((b) => ({ label: b, value: b }));
 
 interface GoatFormDialogProps {
   goat?: Goat;
@@ -89,7 +84,9 @@ function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+      {pending && (
+        <GoatSpinner size="sm" label="Saving…" className="text-primary-foreground" />
+      )}
       {pending ? "Saving..." : label}
     </Button>
   );
@@ -181,6 +178,28 @@ export function GoatFormDialog({
     goat?.barn_id != null ? String(goat.barn_id) : "",
   );
 
+  // UPD-013 — the "Add another kid from this same birth" loop, newborn mode
+  // only. "wizard" is the existing UPD-010 flow (unchanged); a successful save
+  // switches to "confirm" (Done / Add another) instead of closing the dialog;
+  // "quickAdd" is the short litter-mate form. `addedSoFar` drives the running
+  // "added so far" list; `litterDob` / `litterBarnId` are captured from the
+  // first kid's save and locked (read-only) for every litter mate after it —
+  // this is what keeps UPD-012's same-dam/same-date kidding-event grouping
+  // correct. `lastSire` carries the previous kid's sire forward as the next
+  // quick-add form's editable pre-fill.
+  const [phase, setPhase] = useState<"wizard" | "confirm" | "quickAdd">(
+    "wizard",
+  );
+  const [addedSoFar, setAddedSoFar] = useState<
+    { tag: string; sex: GoatSex }[]
+  >([]);
+  const [litterDob, setLitterDob] = useState("");
+  const [litterBarnId, setLitterBarnId] = useState("");
+  const [lastSire, setLastSire] = useState<ParentSelection>({
+    goatId: null,
+    name: null,
+  });
+
   const [breedChoice, setBreedChoice] = useState(initialBreedChoice(initialComp));
   const [otherBreed, setOtherBreed] = useState(initialOtherBreed(initialComp));
   const [crossFirst, setCrossFirst] = useState(
@@ -221,7 +240,16 @@ export function GoatFormDialog({
     async (_prevState: string | undefined, formData: FormData) => {
       const result = await submit(formData);
       if (!result) {
-        setOpen(false);
+        if (isNewborn) {
+          // UPD-013 — offer the loop instead of closing.
+          setAddedSoFar((prev) => [...prev, { tag, sex }]);
+          setLitterDob(dob);
+          setLitterBarnId(barnId);
+          setLastSire(sireSel);
+          setPhase("confirm");
+        } else {
+          setOpen(false);
+        }
       }
       return result;
     },
@@ -248,6 +276,12 @@ export function GoatFormDialog({
     });
     setUseParentsBreed(false);
     setParentsResetKey(0);
+    // UPD-013 — a freshly opened dialog always starts a new litter loop.
+    setPhase("wizard");
+    setAddedSoFar([]);
+    setLitterDob("");
+    setLitterBarnId("");
+    setLastSire({ goatId: null, name: null });
   }
 
   function handleOriginChange(values: string[]) {
@@ -394,27 +428,102 @@ export function GoatFormDialog({
           <DialogTitle>
             {isEdit
               ? "Edit Goat"
-              : isNewborn
-                ? "Add newborn kid"
-                : "Add Goat"}
+              : !isNewborn
+                ? "Add Goat"
+                : phase === "confirm"
+                  ? "Kid added"
+                  : phase === "quickAdd"
+                    ? "Add another kid from this same birth"
+                    : "Add newborn kid"}
           </DialogTitle>
           <DialogDescription>
             {isEdit
               ? "Update this goat's details."
-              : isNewborn
-                ? `Record a new kid born to ${newbornDam!.tag}. A temporary tag is assigned now — give it a real tag later.`
-                : "Register a new goat to your farm."}
+              : !isNewborn
+                ? "Register a new goat to your farm."
+                : phase === "confirm"
+                  ? "Add another litter mate, or finish here."
+                  : phase === "quickAdd"
+                    ? "Dam, origin, date of birth, and barn are locked to match the first kid — they all came from the same birth."
+                    : `Record a new kid born to ${newbornDam!.tag}. A temporary tag is assigned now — give it a real tag later.`}
           </DialogDescription>
         </DialogHeader>
 
-        <StepIndicator
-          steps={steps}
-          index={wizard.index}
-          onStepSelect={wizard.goTo}
-          maxSelectable={isEdit ? undefined : wizard.maxReached}
-        />
+        {isNewborn && phase !== "wizard" ? (
+          <div className="flex flex-col gap-4">
+            {addedSoFar.length > 0 && (
+              <div className="flex flex-col gap-1.5 rounded-xl border border-surface-border bg-subtle p-3">
+                <p className="text-xs font-medium tracking-wide text-copy-muted uppercase">
+                  Added so far
+                </p>
+                <p className="text-sm text-copy-primary">
+                  {addedSoFar
+                    .map(
+                      (kid) =>
+                        `${kid.tag} (${kid.sex === "male" ? "Male" : "Female"})`,
+                    )
+                    .join(", ")}
+                </p>
+              </div>
+            )}
 
-        <form
+            {phase === "confirm" ? (
+              <div className="flex flex-col gap-2 sm:flex-row-reverse">
+                <Button
+                  type="button"
+                  onClick={() => setPhase("quickAdd")}
+                >
+                  Add another kid from this same birth
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                >
+                  Done
+                </Button>
+              </div>
+            ) : (
+              <LitterMateQuickAddForm
+                key={addedSoFar.length}
+                dam={{
+                  id: newbornDam!.id,
+                  tag: newbornDam!.tag,
+                  name: goats.find((g) => g.id === newbornDam!.id)?.name ?? null,
+                }}
+                dateOfBirth={litterDob}
+                barn={{
+                  id: litterBarnId,
+                  name: barns.find((b) => String(b.id) === litterBarnId)?.name ?? "—",
+                }}
+                initialSire={lastSire}
+                goats={goats}
+                existingTags={[
+                  ...goats.map((g) => g.tag),
+                  ...addedSoFar.map((k) => k.tag),
+                ]}
+                onAdded={(kid) => {
+                  setAddedSoFar((prev) => [
+                    ...prev,
+                    { tag: kid.tag, sex: kid.sex },
+                  ]);
+                  setLastSire(kid.sire);
+                  setPhase("confirm");
+                }}
+                onCancel={() => setPhase("confirm")}
+              />
+            )}
+          </div>
+        ) : (
+          <>
+            <StepIndicator
+              steps={steps}
+              index={wizard.index}
+              onStepSelect={wizard.goTo}
+              maxSelectable={isEdit ? undefined : wizard.maxReached}
+            />
+
+            <form
           action={formAction}
           className="flex flex-col gap-4"
           onKeyDown={(e) => {
@@ -949,7 +1058,9 @@ export function GoatFormDialog({
               />
             )}
           </div>
-        </form>
+            </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

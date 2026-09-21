@@ -307,18 +307,35 @@ export function GoatBreedingTab({ data }: { data: GoatBreedingTabData }) {
 
   return (
     <TabCard title="Kidding performance">
-      <div className="flex flex-col gap-0.5">
-        <span className="text-3xl font-semibold tabular-nums text-copy-primary">
-          {data.row.kidSummary.total}
-        </span>
-        <span className="text-xs text-copy-muted">total kids</span>
-        {data.row.kidSummary.total > 0 && (
-          <p className="mt-1 text-sm text-copy-secondary">
-            Total: {data.row.kidSummary.total}
-            {data.row.kidSummary.byStatus.map(
-              (segment) => ` · ${segment.count} ${segment.label}`,
-            )}
-          </p>
+      <div className="flex flex-wrap gap-6">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-3xl font-semibold tabular-nums text-copy-primary">
+            {data.row.kidSummary.total}
+          </span>
+          <span className="text-xs text-copy-muted">total kids</span>
+          {data.row.kidSummary.total > 0 && (
+            <p className="mt-1 text-sm text-copy-secondary">
+              Total: {data.row.kidSummary.total}
+              {data.row.kidSummary.byStatus.map(
+                (segment) => ` · ${segment.count} ${segment.label}`,
+              )}
+            </p>
+          )}
+        </div>
+        {/* UPD-014 — the litter-size capability stat, shown only once she has
+            kidding history (nothing here for a doe who hasn't kidded yet). */}
+        {data.row.litterStats && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-3xl font-semibold tabular-nums text-copy-primary">
+              {data.row.litterStats.averageLitterSize}
+            </span>
+            <span className="text-xs text-copy-muted">
+              average litter size
+            </span>
+            <p className="mt-1 text-sm text-copy-secondary">
+              {data.row.litterSizeBreakdownLabel}
+            </p>
+          </div>
         )}
       </div>
       <DoeCard row={data.row} defaultOpen />

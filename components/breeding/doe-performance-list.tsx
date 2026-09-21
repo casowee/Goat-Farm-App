@@ -229,9 +229,9 @@ export function DoeCard({
                   <Fragment key={`${event.dateLabel}-${index}`}>
                     <li className="text-xs text-copy-secondary">
                       {event.dateLabel} —{" "}
-                      {event.kidCount === 1
-                        ? "1 kid"
-                        : `${event.kidCount} kids`}
+                      <span className="font-medium">
+                        {event.litterSizeLabel}
+                      </span>
                       {event.kids.length > 0 && (
                         <span className="text-copy-muted">
                           {" "}

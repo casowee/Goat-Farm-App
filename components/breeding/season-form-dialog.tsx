@@ -2,7 +2,8 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Check, Loader2, Plus, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
+import { GoatSpinner } from "@/components/loading/goat-spinner";
 import {
   createBreedingSeason,
   updateBreedingSeason,
@@ -79,7 +80,9 @@ function SubmitButton({
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={disabled || pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+      {pending && (
+        <GoatSpinner size="sm" label="Saving…" className="text-primary-foreground" />
+      )}
       {pending ? "Saving..." : label}
     </Button>
   );
