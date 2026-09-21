@@ -11,7 +11,7 @@
 | ----------------- | ------------------------------------------------------------------ |
 | ID                | `UPD-015`                                                          |
 | Title             | Lightweight loading indicator — three-dot pulse (CSS only, no library, no animal theme) |
-| Status            | `in progress` — reopened 2026-09-21 (second time) for the goat-theme-drop amendment, awaiting the owner's re-test |
+| Status            | `done` — owner re-tested and confirmed 2026-09-21 (final three-dot design)                         |
 | Owner approved?   | yes                                                              |
 | Feature spec(s)   | cross-cutting — `02-auth-and-login`, `12-dashboard-analytics`, general app shell |
 | Depends on        | `03` (app shell, done); complements but does **not** replace `UPD-011`'s dashboard skeletons |
@@ -281,19 +281,23 @@ and `animationDelay` exactly `0s` / `0.15s` / `0.3s` across dots 1/2/3 in every 
 `role="status"` / `aria-label="Loading…"` intact on each group. Authenticated routes and the three in-app
 forms could not be re-exercised live (no owner credentials, same limitation as both prior rounds).
 
-**Owner's hands-on test — pending for this amendment.** Not yet re-confirmed by the owner; `UPD-015` stays
-`in progress` until they do.
+**Owner's hands-on test — 2026-09-21, final round: confirmed working.** Re-tested the three-dot pulse design
+in the running app — sign out/in shows it during auth, the main routes show the route-level indicator, a
+wired form shows the button indicator while saving, and `UPD-011`'s dashboard per-widget skeletons remain
+completely unchanged. `UPD-015` is `done`.
 
 ## 13. Resolution / final state
 
-**In progress — final design (three-dot pulse) build complete, awaiting the owner's re-test.** The public
-`size`/`label`/`className` API is unchanged across all three design rounds; the component itself was renamed
-`GoatSpinner` → `LoadingDots` (file `goat-spinner.tsx` → `loading-dots.tsx`) and its internal rendering
-changed from a hand-drawn SVG → the 🐐 emoji → three pulsing dots, per the two Amendments above. Follow-ups:
+**Shipped and owner-tested — three-dot pulse is the final design.** The public `size`/`label`/`className`
+API is unchanged across all three design rounds; the component itself was renamed `GoatSpinner` →
+`LoadingDots` (file `goat-spinner.tsx` → `loading-dots.tsx`) and its internal rendering went hand-drawn SVG
+→ 🐐 emoji → three pulsing dots, per the two Amendments above, ending on the owner's explicit final call to
+drop any animal theme. Follow-ups, both deliberately left open rather than blocking:
 1. ~~Redraw the goat silhouette~~ — **superseded, not just resolved**: there is no goat theme left to redraw
    or maintain. The owner's final decision dropped animal artwork entirely (Section 15).
 2. Extending `LoadingDots` to the remaining forms' submit buttons (Section 14, owner-confirmed: not now) —
-   still deferred, unaffected by either amendment.
+   still deferred, unaffected by either amendment; cheap follow-on work with the shared component and
+   pattern already proven in 4 places.
 
 ## 14. Open questions (resolve, don't guess)
 
@@ -320,5 +324,5 @@ after Section 10.
 **Final decision (2026-09-21, same day, second round):** on reflection the owner decided to drop the goat
 theme entirely — no SVG, no emoji, nothing animal-themed — in favor of a classic three-dot pulse. This is
 the shipped design; see the second Amendment after Section 10 and Section 11 for the implementation.
-Nothing about "getting the goat right" remains open — there's no goat left in the component. Awaiting the
-owner's re-test before flipping `UPD-015` back to `done`.
+Nothing about "getting the goat right" remains open — there's no goat left in the component.
+**Owner re-tested and confirmed 2026-09-21 — `UPD-015` is `done`.**

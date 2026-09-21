@@ -120,9 +120,8 @@ Supabase email/password, protected routes, sign in/out, branded login page.
 | RLS SQL + owner account creation                     | Back-end  | `done` | run by the owner in the Supabase dashboard               |
 
 > 🔘 **`UPD-015` (Loading Indicator — three-dot pulse; spec file still named `015-goat-loading-spinner.md`
-> for continuity, but nothing about the shipped component is goat-themed) — `in progress`, reopened
-> 2026-09-21 for the owner's final decision, awaiting the owner's re-test.** Cross-cutting, presentational
-> only, no schema impact. Builds the shared `LoadingDots` (`components/loading/loading-dots.tsx`, no new
+> for continuity, but nothing about the shipped component is goat-themed) — `done`, owner re-tested and
+> confirmed 2026-09-21.** Cross-cutting, presentational only, no schema impact. Builds the shared `LoadingDots` (`components/loading/loading-dots.tsx`, no new
 > npm dependency) and finally fulfils this spec's own originally-specified but never-built "small loading
 > animation while authentication resolves" on the login page's sign-in button. Also wired into
 > `app/(app)/loading.tsx`-style route boundaries for the main top-level pages (dashboard, goats, breeding,
