@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { login } from "./actions";
-import { GoatSpinner } from "@/components/loading/goat-spinner";
+import { LoadingDots } from "@/components/loading/loading-dots";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,7 +20,7 @@ function SubmitButton() {
   return (
     <Button type="submit" size="lg" className="w-full" disabled={pending}>
       {pending && (
-        <GoatSpinner size="sm" label="Signing in…" className="text-primary-foreground" />
+        <LoadingDots size="sm" label="Signing in…" className="text-primary-foreground" />
       )}
       {pending ? "Signing in..." : "Sign in"}
     </Button>

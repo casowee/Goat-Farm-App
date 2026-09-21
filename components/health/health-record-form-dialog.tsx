@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Plus } from "lucide-react";
-import { GoatSpinner } from "@/components/loading/goat-spinner";
+import { LoadingDots } from "@/components/loading/loading-dots";
 import {
   createHealthRecord,
   updateHealthRecord,
@@ -77,7 +77,7 @@ function SubmitButton({ label }: { label: string }) {
   return (
     <Button type="submit" disabled={pending}>
       {pending && (
-        <GoatSpinner size="sm" label="Saving…" className="text-primary-foreground" />
+        <LoadingDots size="sm" label="Saving…" className="text-primary-foreground" />
       )}
       {pending ? "Saving..." : label}
     </Button>

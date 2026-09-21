@@ -73,19 +73,22 @@
     background-color: var(--bg-base);
 }
 
-/* UPD-015 — GoatSpinner's hop loop. Transform-only (translateY), GPU-cheap. */
-@keyframes goat-bounce {
+/* UPD-015 — LoadingDots' pulse loop. Transform (scale) + opacity only, GPU-cheap. */
+@keyframes dot-pulse {
     0%,
+    80%,
     100% {
-        transform: translateY(0);
+        transform: scale(0.6);
+        opacity: 0.4;
     }
-    50% {
-        transform: translateY(-18%);
+    40% {
+        transform: scale(1);
+        opacity: 1;
     }
 }
 
-@utility animate-goat-bounce {
-    animation: goat-bounce 0.9s ease-in-out infinite;
+@utility animate-dot-pulse {
+    animation: dot-pulse 1s ease-in-out infinite;
 }
 
 :root {

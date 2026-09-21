@@ -119,6 +119,26 @@ Supabase email/password, protected routes, sign in/out, branded login page.
 | `(app)/` route group + server-side auth guard        | Both      | `done` | defense in depth alongside proxy                          |
 | RLS SQL + owner account creation                     | Back-end  | `done` | run by the owner in the Supabase dashboard               |
 
+> 🔘 **`UPD-015` (Loading Indicator — three-dot pulse; spec file still named `015-goat-loading-spinner.md`
+> for continuity, but nothing about the shipped component is goat-themed) — `in progress`, reopened
+> 2026-09-21 for the owner's final decision, awaiting the owner's re-test.** Cross-cutting, presentational
+> only, no schema impact. Builds the shared `LoadingDots` (`components/loading/loading-dots.tsx`, no new
+> npm dependency) and finally fulfils this spec's own originally-specified but never-built "small loading
+> animation while authentication resolves" on the login page's sign-in button. Also wired into
+> `app/(app)/loading.tsx`-style route boundaries for the main top-level pages (dashboard, goats, breeding,
+> health, inventory) and a representative set of primary save buttons (goat form, breeding season form,
+> health record form), via `useFormStatus`. Deliberately does not touch `UPD-011`'s per-widget dashboard
+> skeletons under feature 12.
+> **Round 1:** a hand-drawn SVG goat silhouette + CSS keyframe; the owner tested it and confirmed everything
+> worked except the artwork, which didn't read well as a goat.
+> **Round 2:** dropped the SVG for the real 🐐 Unicode emoji character as text content instead — simpler
+> than the SVG build, same animation/accessibility/call sites.
+> **Round 3 — final design:** the owner decided to drop the goat theme entirely, in any form, for a classic
+> three-dot pulse (each dot scaling/fading, staggered by `animation-delay`). Component renamed
+> `GoatSpinner` → `LoadingDots`. See `context/update-specs/015-goat-loading-spinner.md` for full detail on
+> all three rounds, including a button-contrast bug found in round 1, made moot by round 2's emoji, then
+> **resurfacing and getting fixed again** in round 3 (the dots use `bg-current`, same risk as the SVG).
+
 ---
 
 ### 03 — app-shell · Front-end · `done`

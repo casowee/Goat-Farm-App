@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Check, Plus, X } from "lucide-react";
-import { GoatSpinner } from "@/components/loading/goat-spinner";
+import { LoadingDots } from "@/components/loading/loading-dots";
 import {
   createBreedingSeason,
   updateBreedingSeason,
@@ -81,7 +81,7 @@ function SubmitButton({
   return (
     <Button type="submit" disabled={disabled || pending}>
       {pending && (
-        <GoatSpinner size="sm" label="Saving…" className="text-primary-foreground" />
+        <LoadingDots size="sm" label="Saving…" className="text-primary-foreground" />
       )}
       {pending ? "Saving..." : label}
     </Button>
