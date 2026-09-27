@@ -50,7 +50,7 @@ function healthRow(item: DueSoonItem, index: number): Row {
     primary: (
       <Link
         href={`/goats/${item.goatId}`}
-        className="text-sm font-medium text-copy-primary hover:text-brand"
+        className="tappable-inline text-sm font-medium text-copy-primary hover:text-brand"
       >
         {item.goatName ?? item.goatTag}
       </Link>

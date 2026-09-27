@@ -277,7 +277,7 @@ export function GoatBreedingTab({ data }: { data: GoatBreedingTabData }) {
         <p className="text-sm text-copy-muted">
           {data.label} hasn&apos;t been assigned to any breeding season yet.
           Assign him from the{" "}
-          <Link href="/breeding" className="text-brand underline">
+          <Link href="/breeding" className="tappable-inline text-brand underline">
             Breeding
           </Link>{" "}
           page when he goes in with a group.
@@ -350,7 +350,7 @@ export function GoatBreedingTab({ data }: { data: GoatBreedingTabData }) {
           She&apos;s currently flagged on the{" "}
           <Link
             href="/breeding/doe-performance"
-            className="text-brand underline"
+            className="tappable-inline text-brand underline"
           >
             Doe Performance
           </Link>{" "}

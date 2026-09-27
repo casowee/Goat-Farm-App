@@ -46,7 +46,7 @@ export function BreedingStatus({
       <p className="text-sm text-copy-secondary">{line}</p>
       <Link
         href="/breeding"
-        className="text-xs font-medium text-brand hover:underline"
+        className="tappable-inline text-xs font-medium text-brand hover:underline"
       >
         View breeding →
       </Link>

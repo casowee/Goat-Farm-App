@@ -29,6 +29,10 @@ export const MEDICINE_CATEGORIES: MedicineCategory[] = [
   "anti_inflammatory",
   "dewormer",
   "other",
+  // UPD-017 — dip wash products, so dip wash can identify WHICH product was
+  // used the same way deworming does. Listed last to match the order Postgres
+  // reports the enum in after `ALTER TYPE ... ADD VALUE`.
+  "dip_wash",
 ];
 
 export const MEDICINE_CATEGORY_LABELS: Record<MedicineCategory, string> = {
@@ -37,6 +41,7 @@ export const MEDICINE_CATEGORY_LABELS: Record<MedicineCategory, string> = {
   anti_inflammatory: "Anti-inflammatory",
   dewormer: "Dewormer",
   other: "Other",
+  dip_wash: "Dip Wash",
 };
 
 export function isInventoryItemType(value: string): value is InventoryItemType {

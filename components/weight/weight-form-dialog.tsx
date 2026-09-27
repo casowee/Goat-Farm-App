@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2, Plus } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
+import { Plus } from "lucide-react";
 import {
   createWeight,
   updateWeight,
@@ -32,16 +32,6 @@ interface WeightFormDialogProps {
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Saving..." : label}
-    </Button>
-  );
 }
 
 export function WeightFormDialog({
@@ -132,7 +122,7 @@ export function WeightFormDialog({
           {error && <p className="text-sm text-error">{error}</p>}
 
           <DialogFooter>
-            <SubmitButton label={isEdit ? "Save" : "Add weight"} />
+            <SubmitButton>{isEdit ? "Save" : "Add weight"}</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

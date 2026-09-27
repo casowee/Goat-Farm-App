@@ -59,7 +59,7 @@ Small features stay a single row. Sub-feature tables below are filled in for fin
 | 4     | 12  | dashboard-analytics         | Both       | `done` ****** — built **ahead of 09 and 11 at the owner's request** (out of roadmap order) and confirmed working by the owner in the running app (2026-08-29); Sales widget deferred to a "coming soon" placeholder until 11 exists |
 | 4     | 13  | calendar                    | Both       | `planned`     |
 | 5     | 14  | todos-reminders             | Both       | `planned`     |
-| 5     | 15  | health-reference (Doctor)   | Front-end  | `planned`     |
+| 5     | 15  | health-reference (Doctor)   | Both       | `in progress` ◀ — static reference content + `/doctor` browse & condition pages, plus **"mark a treatment as effective"** (one additive `health_records.marked_effective` column, so this unit is no longer front-end-only) |
 | 5     | 16  | reports-pdf                 | Both       | `planned`     |
 
 `*` Barns code is complete and verified. **Cross-account RLS: confirmed (2026-08-29)** — see the cross-cutting note below.
@@ -228,7 +228,7 @@ The spec (`context/feature-specs/07-health-records.md`) consolidates all health 
 | `create/update/delete/listByGoat` server actions                   | Back-end  | `done` | `app/(app)/health/actions.ts`; conditional fields stripped server-side by record type    |
 | Add/edit dialog (3-step wizard, reuses `components/forms/`)         | Front-end | `done` | `components/health/health-record-form-dialog.tsx`; conditional fields per Section 6       |
 | Goat-profile Health tab (chronological, newest-first)              | Front-end | `done` | `app/(app)/goats/[id]/page.tsx` + `health-record-list.tsx` + `delete-health-record-dialog.tsx` |
-| Global `/health` page (all goats, filterable)                      | —         | deferred | Section 9 Q1 — owner chose to defer; `/health` keeps its placeholder                    |
+| Global `/health` page (all goats, filterable)                      | Both      | `in progress` | **un-deferred and built by `UPD-016`** (2026-09-27) — History + Schedule tabs; was Section 9 Q1's deferred item, so `/health` sat on spec `03`'s placeholder until then |
 | Owner's cross-account RLS check on `health_records` | — | `done` | confirmed manually by the owner 2026-08-29 (2nd test user sees no health records) |
 | Owner's hands-on test of the rest of the Section 10 checklist | — | `in progress` | the owner tests every spec themselves before it closes; not yet done for 07 |
 
@@ -236,6 +236,7 @@ The spec (`context/feature-specs/07-health-records.md`) consolidates all health 
 
 - `context/update-specs/004-health-record-presets.md` (`UPD-004`, `done`) turned the health-record dialog's free-text Title field into a searchable **combobox** filtered by `record_type`, backed by a new `health_condition_presets` catalogue (seeded farm-wide defaults with `owner_id` null + the owner's own custom presets), with a "+ Add new" reveal that saves a typed title back as an owner-scoped preset. Migration `20260829000003_health_condition_presets.sql` with **split** select/insert/update/delete RLS (deliberate deviation from the single `for all` convention — see the spec's Section 6) so seeded global presets are readable but never editable/deletable by any authenticated user at the DB layer. Added the shadcn `combobox` + `input-group` primitives (`components/ui/`). Owner applied the migration, regenerated types (byte-identical to the stand-in), and confirmed it works in the running app (2026-08-29).
 - `context/update-specs/005-treatment-medication-inventory.md` (`UPD-005`, `done`) makes the health-record medication/product fields searchable comboboxes over a new **`inventory_items`** table (reusing `UPD-004`'s combobox), each option showing name + quantity and a "⚠ No stock recorded" warning at quantity 0 (still selectable). Migrations `20260829000004_inventory_items.sql` (`bigserial` id, single `for all` owner RLS, `inventory_item_type` enum `medicine`/`feed`, 13 drugs seeded at quantity 0) and `20260829000005_inventory_items_category.sql` (adds a nullable `medicine_category` enum column + backfill, so the **Deworming** step — which gained a new optional product field — offers only dewormers and the **Treatment** step offers everything else). `health_records.medication` stays plain text (no FK). Owner applied both migrations, regenerated types (byte-identical to the stand-in), and confirmed it works in the running app (2026-08-29). **`inventory_items` is forward-provisioned for spec 10 — see the Phase 3 Inventory note; spec 10 extends this table, it does not recreate it.**
+- `context/update-specs/016-health-schedule-and-dip-wash.md` (`UPD-016`, `in progress`, built 2026-09-27) **un-defers the "Global `/health` page" row above and builds it for the first time.** The route was still spec `03`'s `ModulePlaceholder` — verified before building, not assumed. Sidebar label "Health History" → **"Health"** (the old label is retired, not renamed-from: it never held real content), same route, no new nav entry. Two tabs: **History**, a farm-wide newest-first aggregation of the per-goat records feature `07` already stores, with goat and record-type filters held in the URL; and **Schedule**, farm-wide upcoming/overdue due items with a 30/60/90-day lookahead selector defaulting to 90 (owner-confirmed). Also adds **`dip_wash`** as a real health record type with the vaccination/deworming date-given + next-due-date pattern — one standalone additive migration, `20260927000003_health_record_type_dip_wash.sql` (`alter type health_record_type add value if not exists 'dip_wash'`, on its own for the same Postgres transaction-visibility reason as `20260830000001`); no new table, no RLS change. The Schedule tab **calls the same `dueSoon()`** as the dashboard's Due soon widget with a wider `windowDays` — extended, not duplicated; the widget itself is untouched and now also surfaces dip wash. Adding `dip_wash` to `FOLLOW_UP_RECORD_TYPES` in `lib/health/records.ts` was the *whole* conditional-field change, since the form and the server-side parsing both read those constants. The farm-wide list is deliberately **read-only** — records are still created, edited and deleted only on the goat's own Health tab (unchanged), reached via `GoatLink`. Dip-wash presets are empty by construction, with the existing combobox's "+ Add new" available; no product names invented. Feature `15` (Health Reference / `/doctor`) is untouched. **Not `done`:** the owner must run the migration + `npm run gen:types`, then hands-on test it.
 
 ### 08 — weight-records · Both · `in progress` — ⏸ PAUSED at the owner's request
 Weight entries per goat + growth chart (Recharts — the project's first chart). **Depends on:** 05, 06.
@@ -497,9 +498,12 @@ Month/week view merging vaccination & deworming due dates, expected kidding, fee
 Farm tasks and feeding schedule; automatic reminders from recorded next-due dates. **Depends on:** 07.
 *Likely split:* `tasks` table + actions `(Back-end)` · reminder derivation in `lib` `(Back-end · logic)` · to-do list UI `(Front-end)`.
 
-### 15 — health-reference (Doctor) · Front-end · `planned`
-Static library of common ailments with the non-diagnostic disclaimer. **No back-end** — content ships in the repo, no DB table.
-Independent of the data modules — can slot in earlier as a lighter change between heavier ones.
+### 15 — health-reference (Doctor) · Both · `in progress`
+Static library of common ailments with the non-diagnostic disclaimer, **plus** a personalised "what worked before"
+history: every health record logged under a condition's name, across all goats, with a **mark as effective** flag.
+Spec: `context/feature-specs/15-health-reference.md`. **Depends on:** `07` (health records), `UPD-004` (the preset
+name strings the static content must match character-for-character). The effectiveness flag is one additive column
+on `health_records` — no new table — so this unit is **Both**, not the front-end-only change first sketched here.
 
 ### 16 — reports-pdf · Both · `planned`
 Goat history, herd summary, and sales reports via `@react-pdf/renderer`. **Depends on:** the data modules.

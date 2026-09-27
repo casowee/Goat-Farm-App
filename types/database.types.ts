@@ -704,6 +704,7 @@ export type Database = {
           dosage: string | null
           goat_id: number
           id: number
+          marked_effective: boolean
           medication_name: string | null
           next_due_date: string | null
           notes: string | null
@@ -724,6 +725,7 @@ export type Database = {
           dosage?: string | null
           goat_id: number
           id?: number
+          marked_effective?: boolean
           medication_name?: string | null
           next_due_date?: string | null
           notes?: string | null
@@ -744,6 +746,7 @@ export type Database = {
           dosage?: string | null
           goat_id?: number
           id?: number
+          marked_effective?: boolean
           medication_name?: string | null
           next_due_date?: string | null
           notes?: string | null
@@ -1140,6 +1143,7 @@ export type Database = {
         | "checkup"
         | "injury"
         | "surgery"
+        | "dip_wash"
       herd_event_type: "sale" | "death" | "other_addition" | "other_removal"
       inventory_item_type: "medicine" | "feed"
       medicine_category:
@@ -1148,6 +1152,7 @@ export type Database = {
         | "anti_inflammatory"
         | "dewormer"
         | "other"
+        | "dip_wash"
       reproductive_state: "intact" | "castrated"
     }
     CompositeTypes: {
@@ -1295,6 +1300,7 @@ export const Constants = {
         "checkup",
         "injury",
         "surgery",
+        "dip_wash",
       ],
       herd_event_type: ["sale", "death", "other_addition", "other_removal"],
       inventory_item_type: ["medicine", "feed"],
@@ -1304,6 +1310,7 @@ export const Constants = {
         "anti_inflammatory",
         "dewormer",
         "other",
+        "dip_wash",
       ],
       reproductive_state: ["intact", "castrated"],
     },

@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
+import { Plus, Trash2 } from "lucide-react";
 import {
   createSeasonTemplate,
   updateSeasonTemplate,
@@ -24,16 +24,6 @@ const MONTH_ITEMS = MONTH_NAMES.map((name, index) => ({
   label: name,
   value: String(index + 1),
 }));
-
-function SaveButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" size="sm" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Saving..." : label}
-    </Button>
-  );
-}
 
 function TemplateRow({ template }: { template: SeasonTemplate }) {
   const [startMonth, setStartMonth] = useState(String(template.start_month));
@@ -93,7 +83,7 @@ function TemplateRow({ template }: { template: SeasonTemplate }) {
             required
           />
         </div>
-        <SaveButton label="Save" />
+        <SubmitButton size="sm">Save</SubmitButton>
       </form>
 
       <form action={deleteAction}>
@@ -183,7 +173,7 @@ function NewTemplateForm() {
           required
         />
       </div>
-      <SaveButton label="Add" />
+      <SubmitButton size="sm">Add</SubmitButton>
       <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
         Cancel
       </Button>

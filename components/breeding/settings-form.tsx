@@ -1,10 +1,8 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2 } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
 import { upsertBreedingSettings } from "@/app/(app)/breeding/actions";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   DEFAULT_BREEDING_SETTINGS,
@@ -12,16 +10,6 @@ import {
   gestationDaysFromMonthsWeeks,
   type BreedingSettings,
 } from "@/lib/breeding/settings";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Saving..." : "Save settings"}
-    </Button>
-  );
-}
 
 export function SettingsForm({ settings }: { settings: BreedingSettings | null }) {
   const initial = settings ?? DEFAULT_BREEDING_SETTINGS;
@@ -159,7 +147,7 @@ export function SettingsForm({ settings }: { settings: BreedingSettings | null }
       )}
 
       <div>
-        <SubmitButton />
+        <SubmitButton>Save settings</SubmitButton>
       </div>
     </form>
   );

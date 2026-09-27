@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { ArrowLeftRight, Loader2 } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
+import { ArrowLeftRight } from "lucide-react";
 import { moveGoatToBarn } from "@/app/(app)/goats/actions";
 import {
   Dialog,
@@ -28,16 +28,6 @@ interface MoveBarnDialogProps {
   goatId: number;
   currentBarnId: number | null;
   barns: { id: number; name: string }[];
-}
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Moving..." : "Move goat"}
-    </Button>
-  );
 }
 
 export function MoveBarnDialog({
@@ -138,7 +128,7 @@ export function MoveBarnDialog({
 
             {error && <p className="text-sm text-error">{error}</p>}
             <DialogFooter>
-              <SubmitButton />
+              <SubmitButton pendingLabel="Moving…">Move goat</SubmitButton>
             </DialogFooter>
           </form>
         )}

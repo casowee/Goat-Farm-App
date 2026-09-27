@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2, Plus } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
+import { Plus } from "lucide-react";
 import { createBarn, updateBarn } from "@/app/(app)/barns/actions";
 import {
   Dialog,
@@ -31,17 +31,6 @@ interface BarnFormDialogProps {
   triggerIcon?: boolean;
   triggerVariant?: "default" | "outline";
   triggerSize?: "default" | "sm";
-}
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Saving..." : label}
-    </Button>
-  );
 }
 
 export function BarnFormDialog({
@@ -124,7 +113,7 @@ export function BarnFormDialog({
           </div>
           {error && <p className="text-sm text-error">{error}</p>}
           <DialogFooter>
-            <SubmitButton label={isEdit ? "Save" : "Add Barn"} />
+            <SubmitButton>{isEdit ? "Save" : "Add Barn"}</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

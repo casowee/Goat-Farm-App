@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useFormStatus } from "react-dom";
 import { navItems } from "@/lib/nav";
 import { signOut } from "@/lib/actions/auth";
 import { LogOut } from "lucide-react";
+import { LoadingDots } from "@/components/loading/loading-dots";
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +19,24 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+
+// Spec 18.1 (§4C) — sign out was the one form in the app with no pending state.
+// It is a SidebarMenuButton rather than a shadcn Button, so it cannot use the
+// shared SubmitButton; it gets the same treatment inline instead.
+function SignOutButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <SidebarMenuButton
+      render={
+        <button type="submit" disabled={pending} aria-busy={pending || undefined}>
+          {pending ? <LoadingDots size="sm" label="Signing out…" /> : <LogOut />}
+          <span>{pending ? "Signing out…" : "Sign out"}</span>
+        </button>
+      }
+    />
+  );
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -71,14 +91,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <form action={signOut}>
-          <SidebarMenuButton
-            render={
-              <button type="submit">
-                <LogOut />
-                <span>Sign out</span>
-              </button>
-            }
-          />
+          <SignOutButton />
         </form>
       </SidebarFooter>
     </Sidebar>

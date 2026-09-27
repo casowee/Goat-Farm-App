@@ -1,9 +1,8 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { SubmitButton } from "@/components/forms/submit-button";
 import { Plus } from "lucide-react";
-import { LoadingDots } from "@/components/loading/loading-dots";
 import { createGoat, updateGoat } from "@/app/(app)/goats/actions";
 import {
   Dialog,
@@ -108,18 +107,6 @@ interface GoatFormDialogProps {
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending && (
-        <LoadingDots size="sm" label="Saving…" className="text-primary-foreground" />
-      )}
-      {pending ? "Saving..." : label}
-    </Button>
-  );
 }
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
@@ -1079,11 +1066,9 @@ export function GoatFormDialog({
           <div className="shrink-0 border-t border-surface-border pt-4">
             {wizard.isLast ? (
               <WizardNav onBack={wizard.back}>
-                <SubmitButton
-                  label={
-                    isEdit ? "Save" : isNewborn ? "Add kid" : "Add Goat"
-                  }
-                />
+                <SubmitButton>
+                  {isEdit ? "Save" : isNewborn ? "Add kid" : "Add Goat"}
+                </SubmitButton>
               </WizardNav>
             ) : (
               <WizardNav

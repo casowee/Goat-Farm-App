@@ -13,6 +13,33 @@ import type { HealthRecordStatus, HealthRecordType } from "@/lib/health/records"
 /** Default 30 days — confirmed by the owner 2026-08-29 (Spec 12, Section 13). */
 export const DEFAULT_DUE_SOON_WINDOW_DAYS = 30;
 
+/**
+ * UPD-016 — the Health page Schedule tab's default window: 90 days, owner-
+ * confirmed. The dashboard keeps its 30-day preview ({@link
+ * DEFAULT_DUE_SOON_WINDOW_DAYS}); the Schedule tab is the dedicated planning
+ * view, so it opens a full quarter ahead. Both call the same {@link dueSoon}
+ * below with a different `windowDays` — there is deliberately no second
+ * implementation of this computation.
+ */
+export const SCHEDULE_DUE_WINDOW_DAYS = 90;
+
+/** The lookahead windows the Schedule tab offers (UPD-016, owner-confirmed). */
+export const DUE_WINDOW_OPTIONS = [30, 60, 90] as const;
+
+export type DueWindowOption = (typeof DUE_WINDOW_OPTIONS)[number];
+
+/**
+ * Narrow a `?window=` search param to one of the offered windows, falling back
+ * to {@link SCHEDULE_DUE_WINDOW_DAYS}. Kept here beside the options themselves
+ * so the URL can never select a window the selector cannot show.
+ */
+export function parseDueWindow(value: string | undefined): DueWindowOption {
+  const parsed = Number(value);
+  return (DUE_WINDOW_OPTIONS as readonly number[]).includes(parsed)
+    ? (parsed as DueWindowOption)
+    : SCHEDULE_DUE_WINDOW_DAYS;
+}
+
 /** One health record, flattened with just enough of its goat to render a row. */
 export interface DueSoonSourceRecord {
   goatId: number;
@@ -66,9 +93,14 @@ function startOfDay(date: Date): Date {
 }
 
 /**
- * Health follow-ups (vaccination / deworming / checkup next-due dates, and any
- * other record type that carries a `next_due_date`) coming due within
- * `windowDays`, soonest-first. Cancelled records are excluded; every other
+ * Health follow-ups coming due within `windowDays`, soonest-first.
+ *
+ * Type-agnostic by design: every record carrying a `next_due_date` is
+ * considered, which is why UPD-016's `dip_wash` needed no change here — adding
+ * it to `FOLLOW_UP_RECORD_TYPES` (so the form offers the next-due-date field) is
+ * enough for dip washes to appear in both the dashboard's Due soon widget and
+ * the Health page's Schedule tab. In practice that means vaccination,
+ * deworming, dip wash and checkup. Cancelled records are excluded; every other
  * status is kept, because `completed` is the normal state for a one-off event
  * that still has a next-due date. Ties break on the goat's tag.
  */

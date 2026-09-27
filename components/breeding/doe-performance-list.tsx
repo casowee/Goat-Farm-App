@@ -1,11 +1,10 @@
 "use client";
 
 import { Fragment, useActionState, useMemo, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { ChevronDown, Loader2, Search, TriangleAlert } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
+import { ChevronDown, Search, TriangleAlert } from "lucide-react";
 import { addDoePerformanceNote } from "@/app/(app)/breeding/doe-performance/actions";
 import { GoatLink } from "@/components/goats/goat-link";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -80,16 +79,6 @@ function FlagChip({ flag }: { flag: DoePerformanceFlag }) {
   );
 }
 
-function SaveNoteButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" size="sm" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Saving..." : "Add note"}
-    </Button>
-  );
-}
-
 function NoteForm({ doeId }: { doeId: number }) {
   const [category, setCategory] = useState("");
   const [noteKey, setNoteKey] = useState(0);
@@ -143,7 +132,7 @@ function NoteForm({ doeId }: { doeId: number }) {
       </div>
       {error && <p className="text-sm text-error">{error}</p>}
       <div>
-        <SaveNoteButton />
+        <SubmitButton size="sm">Add note</SubmitButton>
       </div>
     </form>
   );

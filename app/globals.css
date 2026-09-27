@@ -151,6 +151,61 @@
     }
 }
 
+/* Spec 18.1 (§4A) — the one pressed state for everything tappable that is not a
+   shadcn Button: list-row links, nav items, tabs, goat references. A background
+   tint only, deliberately no scaling — a full-width row that shrinks under the
+   thumb reads as a glitch, where a small button reads as a press.
+
+   The tint is drawn on a ::before overlay rather than `background-color` so the
+   class can be dropped onto an element that already sets its own background (a
+   card, an active nav row) without fighting it. It is transparent until pressed,
+   so there is nothing to see until a finger is down. */
+@utility tappable {
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background-color: var(--accent-primary);
+        opacity: 0;
+        transition: opacity 100ms ease-out;
+        pointer-events: none;
+    }
+
+    &:active::before {
+        opacity: 0.12;
+    }
+
+    /* §4A — the tint *is* the feedback, so it survives reduced motion; only the
+       fade between the two states is dropped. */
+    @media (prefers-reduced-motion: reduce) {
+        &::before {
+            transition: none;
+        }
+    }
+}
+
+/* An inline text link (a goat reference inside a sentence) cannot carry a
+   full-bleed overlay without painting a block behind the words, so it gets the
+   same idea expressed as a color shift instead. */
+@utility tappable-inline {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: color 100ms ease-out;
+
+    &:active {
+        color: var(--accent-secondary);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
+}
+
 :root {
     /* Desert palette (dark theme only, see context/ui-context.md) */
     --bg-base: #0b0a09;
@@ -212,5 +267,58 @@
     }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    }
+}
+
+/* Spec 18.1 (§4B) — remove the browser's own touch artifacts now that the app
+   draws its own pressed states.
+
+   Three separate rules on purpose, because they have three different safe
+   scopes. The grey flash is suppressed document-wide: nothing wants it. Fast
+   taps (`touch-action: manipulation` skips the ~300 ms double-tap-zoom wait) are
+   safe on anything interactive, links included. Text selection and the
+   long-press callout are suppressed on controls ONLY — never on record text,
+   which the user needs to be able to select and copy, and never on inputs,
+   where it would break the selection handles and the paste menu. */
+@layer base {
+    html {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    a,
+    button,
+    summary,
+    label,
+    select,
+    [role="button"],
+    [role="tab"],
+    [role="option"],
+    [role="menuitem"] {
+        touch-action: manipulation;
+    }
+
+    button,
+    summary,
+    [role="button"],
+    [role="tab"],
+    [data-slot="button"],
+    [data-slot="tabs-trigger"],
+    [data-slot="sidebar-menu-button"],
+    [data-slot="toggle"],
+    [data-slot="select-trigger"] {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    /* A control can contain an input (the combobox's text field), and the rule
+       above would otherwise reach it, so selection and the callout are restored
+       explicitly for anything typed into. */
+    input,
+    textarea,
+    [contenteditable="true"] {
+        -webkit-touch-callout: default;
+        -webkit-user-select: text;
+        user-select: text;
     }
 }

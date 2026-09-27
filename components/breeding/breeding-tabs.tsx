@@ -27,7 +27,7 @@ export function BreedingTabs() {
             href={tab.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              "tappable -mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
               active
                 ? "border-brand text-copy-primary"
                 : "border-transparent text-copy-muted hover:text-copy-secondary",

@@ -1,9 +1,8 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { SubmitButton } from "@/components/forms/submit-button";
 import { Check, Plus, X } from "lucide-react";
-import { LoadingDots } from "@/components/loading/loading-dots";
 import {
   createBreedingSeason,
   updateBreedingSeason,
@@ -68,24 +67,6 @@ const NO_TEMPLATE = "__none__";
 
 function maleLabel(male: EligibleMale): string {
   return male.name ? `${male.tag} — ${male.name}` : male.tag;
-}
-
-function SubmitButton({
-  label,
-  disabled,
-}: {
-  label: string;
-  disabled: boolean;
-}) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={disabled || pending}>
-      {pending && (
-        <LoadingDots size="sm" label="Saving…" className="text-primary-foreground" />
-      )}
-      {pending ? "Saving..." : label}
-    </Button>
-  );
 }
 
 export function SeasonFormDialog({
@@ -449,10 +430,9 @@ export function SeasonFormDialog({
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton
-              label={isEdit ? "Save" : "Log season"}
-              disabled={!canSubmit}
-            />
+            <SubmitButton disabled={!canSubmit}>
+              {isEdit ? "Save" : "Log season"}
+            </SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

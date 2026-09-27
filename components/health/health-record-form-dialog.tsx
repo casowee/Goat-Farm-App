@@ -1,9 +1,8 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { SubmitButton } from "@/components/forms/submit-button";
 import { Plus } from "lucide-react";
-import { LoadingDots } from "@/components/loading/loading-dots";
 import {
   createHealthRecord,
   updateHealthRecord,
@@ -30,6 +29,11 @@ import {
 } from "@/components/ui/select";
 import { HealthTitleCombobox } from "@/components/health/health-title-combobox";
 import { MedicationCombobox } from "@/components/health/medication-combobox";
+import {
+  medicinesForRecordType,
+  productFieldFor,
+} from "@/lib/health/products";
+import { MarkEffectiveToggle } from "@/components/health/mark-effective-toggle";
 import type { InventoryItem } from "@/app/(app)/inventory/actions";
 import { StepIndicator } from "@/components/forms/step-indicator";
 import { WizardNav } from "@/components/forms/wizard-nav";
@@ -47,6 +51,7 @@ import {
   isCourseType,
   isFollowUpType,
   isHealthRecordStatus,
+  type HealthRecordType,
 } from "@/lib/health/records";
 
 interface HealthRecordFormDialogProps {
@@ -71,18 +76,6 @@ const STATUS_ITEMS = HEALTH_RECORD_STATUSES.map((s) => ({
   label: HEALTH_RECORD_STATUS_LABELS[s],
   value: s,
 }));
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending && (
-        <LoadingDots size="sm" label="Saving…" className="text-primary-foreground" />
-      )}
-      {pending ? "Saving..." : label}
-    </Button>
-  );
-}
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
@@ -159,17 +152,18 @@ export function HealthRecordFormDialog({
 
   const course = isCourseType(recordType);
   const followUp = isFollowUpType(recordType);
-  const isDeworming = recordType === "deworming";
+  // UPD-017 — which record types carry an inventory-backed product field (and
+  // what to call it) is now one shared map, so dip wash gets the field
+  // deworming already had without a second copy of the logic.
+  const productField = productFieldFor(recordType);
 
-  // UPD-005 amendment — the medication/product combobox is filtered by context:
-  // Deworming offers only dewormer-category items; the Treatment step offers
-  // everything else (antibiotics, vitamins, anti-inflammatories, uncategorised).
+  // UPD-005 amendment, generalised by UPD-017 — the product combobox is
+  // filtered by context: a type with its own product field offers only that
+  // category (dewormers for Deworming, dip washes for Dip wash); the Treatment
+  // step offers everything not reserved by one of those fields.
   const medicinesForContext = useMemo(
-    () =>
-      isDeworming
-        ? medicines.filter((m) => m.category === "dewormer")
-        : medicines.filter((m) => m.category !== "dewormer"),
-    [medicines, isDeworming],
+    () => medicinesForRecordType(medicines, recordType),
+    [medicines, recordType],
   );
   const effectiveStatus: HealthRecordStatus = isHealthRecordStatus(status)
     ? status
@@ -182,8 +176,8 @@ export function HealthRecordFormDialog({
     { id: "event", label: "Event", complete: step0Valid },
     {
       id: "details",
-      label: isDeworming
-        ? "Deworming details"
+      label: productField
+        ? `${HEALTH_RECORD_TYPE_LABELS[recordType as HealthRecordType]} details`
         : followUp
           ? "Follow-up"
           : "Treatment details",
@@ -446,13 +440,13 @@ export function HealthRecordFormDialog({
                 </>
               )}
 
-              {isDeworming && (
+              {productField && (
                 <div className="flex flex-col gap-2">
                   <label
                     htmlFor="medication_name"
                     className="text-sm text-copy-secondary"
                   >
-                    Dewormer product
+                    {productField.label}
                   </label>
                   <input
                     type="hidden"
@@ -467,7 +461,7 @@ export function HealthRecordFormDialog({
                   <MedicationCombobox
                     key={recordType}
                     id="medication_name"
-                    noun="dewormer"
+                    noun={productField.noun}
                     medicines={medicinesForContext}
                     value={medicationName}
                     onChange={(next, isCustom) => {
@@ -475,9 +469,7 @@ export function HealthRecordFormDialog({
                       setMedicationIsCustom(isCustom);
                     }}
                   />
-                  <p className="text-xs text-copy-muted">
-                    Optional. New products added here are filed under dewormers.
-                  </p>
+                  <p className="text-xs text-copy-muted">{productField.hint}</p>
                 </div>
               )}
 
@@ -568,6 +560,37 @@ export function HealthRecordFormDialog({
                 />
               </div>
 
+              {/*
+                Spec 15 (§6) — "mark this treatment as effective", on the record's
+                own edit form. It is the shared MarkEffectiveToggle, calling the
+                shared setHealthRecordEffective action on the shared
+                marked_effective column, so this control and the Doctor condition
+                page's are the same control writing the same flag — one code path,
+                not two that could drift.
+
+                It is deliberately NOT part of this form's submit:
+                updateHealthRecord never touches marked_effective, so editing
+                a dosage or a note can never silently clear the flag, and the toggle
+                needs a record id, which only exists once the record does. Hence
+                edit-only, and hence the "saved right away" note.
+              */}
+              {isEdit && record && (
+                <div className="flex flex-col gap-2 rounded-xl border border-surface-border bg-subtle p-3">
+                  <p className="text-sm text-copy-secondary">
+                    Did this work?
+                  </p>
+                  <MarkEffectiveToggle
+                    recordId={record.id}
+                    effective={record.marked_effective}
+                  />
+                  <p className="text-xs text-copy-muted">
+                    Marked treatments are shown first under this condition in the
+                    Health Reference, so you can find what worked last time. Saved
+                    right away — it does not wait for Save.
+                  </p>
+                </div>
+              )}
+
               <div className="flex flex-col gap-1.5 rounded-xl border border-surface-border bg-subtle p-3">
                 <p className="text-xs font-medium tracking-wide text-copy-muted uppercase">
                   Review
@@ -597,7 +620,7 @@ export function HealthRecordFormDialog({
           <div className="border-t border-surface-border pt-4">
             {wizard.isLast ? (
               <WizardNav onBack={wizard.back}>
-                <SubmitButton label={isEdit ? "Save" : "Add record"} />
+                <SubmitButton>{isEdit ? "Save" : "Add record"}</SubmitButton>
               </WizardNav>
             ) : (
               <WizardNav

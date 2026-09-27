@@ -11,8 +11,7 @@
 // when in-system compositions are known, otherwise the normal manual picker).
 
 import { useActionState, useMemo, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2 } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
 import { createGoat } from "@/app/(app)/goats/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,16 +56,6 @@ interface LitterMateQuickAddFormProps {
   existingTags: string[];
   onAdded: (kid: { tag: string; sex: GoatSex; sire: ParentSelection }) => void;
   onCancel: () => void;
-}
-
-function SubmitButton({ disabled }: { disabled: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending || disabled}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Saving..." : "Add kid"}
-    </Button>
-  );
 }
 
 export function LitterMateQuickAddForm({
@@ -371,7 +360,7 @@ export function LitterMateQuickAddForm({
         <Button type="button" variant="ghost" onClick={onCancel}>
           Back
         </Button>
-        <SubmitButton disabled={!canSubmit} />
+        <SubmitButton disabled={!canSubmit}>Add kid</SubmitButton>
       </div>
     </form>
   );

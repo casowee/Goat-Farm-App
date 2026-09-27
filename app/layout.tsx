@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SwBridge } from "@/components/pwa/sw-bridge";
+import { TouchActiveBridge } from "@/components/pwa/touch-active-bridge";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,6 +39,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Spec 17.1 — registers public/sw.js (production only) and refreshes
             the page when the service worker revalidates it in the background. */}
         <SwBridge />
+        {/* Spec 18.1 — one passive, empty touchstart listener so iOS Safari
+            applies the app's :active pressed states on touch. */}
+        <TouchActiveBridge />
         {children}
       </body>
     </html>

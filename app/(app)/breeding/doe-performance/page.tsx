@@ -127,7 +127,7 @@ export default async function DoePerformancePage() {
           Active does falling behind on kidding — overdue since their last
           kidding, a long historical average interval, or old enough to have
           kidded (past the{" "}
-          <Link href="/breeding/settings" className="text-brand underline">
+          <Link href="/breeding/settings" className="tappable-inline text-brand underline">
             breeding-eligible age
           </Link>
           ) but never have. Flags are worked out live from your settings; the

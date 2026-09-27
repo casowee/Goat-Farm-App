@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2, Plus } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
+import { Plus } from "lucide-react";
 import {
   createInventoryItem,
   updateInventoryItem,
@@ -46,17 +46,6 @@ interface InventoryItemDialogProps {
   triggerSize?: "default" | "sm";
   /** Preselects the Type toggle when adding from a specific tab. */
   defaultType?: InventoryItemType;
-}
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Saving..." : label}
-    </Button>
-  );
 }
 
 export function InventoryItemDialog({
@@ -265,7 +254,7 @@ export function InventoryItemDialog({
 
           {error && <p className="text-sm text-error">{error}</p>}
           <DialogFooter>
-            <SubmitButton label={isEdit ? "Save" : "Add item"} />
+            <SubmitButton>{isEdit ? "Save" : "Add item"}</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

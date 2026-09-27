@@ -106,7 +106,7 @@ function NodeCard({
 
   if (node.kind === "goat" && node.goatId != null && !isRoot) {
     return (
-      <Link href={`/goats/${node.goatId}`} className={className + " hover:border-brand"}>
+      <Link href={`/goats/${node.goatId}`} className={className + " tappable hover:border-brand"}>
         {body}
       </Link>
     );

@@ -1,25 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2 } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
 import { upsertDoePerformanceSettings } from "@/app/(app)/breeding/doe-performance/actions";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   DEFAULT_DOE_PERFORMANCE_SETTINGS,
   type DoePerformanceSettings,
 } from "@/lib/breeding/doe-performance";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Saving..." : "Save settings"}
-    </Button>
-  );
-}
 
 export function DoePerformanceSettingsForm({
   settings,
@@ -96,7 +84,7 @@ export function DoePerformanceSettingsForm({
       )}
 
       <div>
-        <SubmitButton />
+        <SubmitButton>Save settings</SubmitButton>
       </div>
     </form>
   );

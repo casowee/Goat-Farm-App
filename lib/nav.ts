@@ -6,6 +6,7 @@ import {
   PawPrint,
   Scale,
   ShoppingCart,
+  Stethoscope,
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
@@ -22,7 +23,13 @@ export const navItems: NavItem[] = [
   { label: "Goat Records", href: "/goats", icon: PawPrint },
   // Spec 10 repurposed the `/medicine` stub into farm-wide Inventory.
   { label: "Inventory", href: "/inventory", icon: Package },
-  { label: "Health History", href: "/health", icon: HeartPulse },
+  // UPD-016 — "Health History" retired: that label sat on spec 03's stub and
+  // never held real content. The route is now the real farm-wide Health page
+  // (History + Schedule tabs), so the label is simply "Health".
+  { label: "Health", href: "/health", icon: HeartPulse },
+  // Spec 15 — the Doctor module: static, non-diagnostic condition reference plus
+  // this farm's own "what worked before" treatment history per condition.
+  { label: "Health Reference", href: "/doctor", icon: Stethoscope },
   { label: "Breeding History", href: "/breeding", icon: Baby },
   { label: "Weight History", href: "/weight", icon: Scale },
   // The `/vaccinations` and `/deworming` stubs were removed in spec 10 —

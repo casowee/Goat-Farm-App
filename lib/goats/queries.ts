@@ -18,13 +18,16 @@ import { createClient } from "@/lib/supabase/server";
 
 /**
  * The union of every column the herd-wide consumers read: the pedigree walk and
- * parent pickers (tag / name / sex / status / temp tag / parent links) and the
- * doe-performance computation (reproductive state / date of birth / `dam_id`).
- * Deliberately a superset of both, so one query serves both and `cache()` can
- * collapse them.
+ * parent pickers (tag / name / sex / status / temp tag / parent links), the
+ * doe-performance computation (reproductive state / date of birth / `dam_id`)
+ * and UPD-017’s bulk-schedule goat picker, which reuses the goats list’s own
+ * `filterGoats` (sex / stage / barn / status / search) and needs `barn_id` for
+ * the Barn filter.
+ * Deliberately a superset of all of them, so one query serves them all and
+ * `cache()` can collapse them.
  */
 const HERD_GOAT_COLUMNS =
-  "id, tag, name, sex, reproductive_state, date_of_birth, status, is_temp_tag, sire_id, dam_id, sire_name, dam_name, breed_composition:goat_breed_composition(breed, pct)";
+  "id, tag, name, sex, reproductive_state, date_of_birth, status, is_temp_tag, barn_id, sire_id, dam_id, sire_name, dam_name, breed_composition:goat_breed_composition(breed, pct)";
 
 type HerdGoatQuery = ReturnType<typeof herdGoatQuery>;
 export type HerdGoat = NonNullable<Awaited<HerdGoatQuery>["data"]>[number];

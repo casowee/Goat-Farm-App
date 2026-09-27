@@ -1,9 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { SubmitButton } from "@/components/forms/submit-button";
 import { useRouter } from "next/navigation";
-import { Loader2, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { deleteGoat } from "@/app/(app)/goats/actions";
 import {
   recordGoatDeparture,
@@ -54,28 +54,6 @@ const REASON_TO_KIND: Record<
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function SubmitButton({
-  label,
-  disabled,
-  destructive,
-}: {
-  label: string;
-  disabled: boolean;
-  destructive?: boolean;
-}) {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      variant={destructive ? "destructive" : "default"}
-      disabled={disabled || pending}
-    >
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Working…" : label}
-    </Button>
-  );
 }
 
 /**
@@ -282,12 +260,16 @@ export function RemoveGoatDialog({
 
           <DialogFooter showCloseButton>
             <SubmitButton
-              label={
-                reason === "wrong_registration" ? "Delete permanently" : "Confirm"
+              variant={
+                reason === "wrong_registration" ? "destructive" : "default"
               }
-              destructive={reason === "wrong_registration"}
+              pendingLabel="Working…"
               disabled={!canSubmit}
-            />
+            >
+              {reason === "wrong_registration"
+                ? "Delete permanently"
+                : "Confirm"}
+            </SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

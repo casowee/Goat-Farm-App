@@ -1,0 +1,21 @@
+-- UPD-017 (Section 6) — dip wash gets its own product list.
+--
+-- UPD-016 made `dip_wash` a real health record type but gave it no way to
+-- record WHICH product was used. Deworming solves that with an inventory-backed
+-- combobox filtered to `medicine_category = 'dewormer'` (UPD-005 amendment);
+-- dip wash reuses that exact component, so all it needs is a category of its
+-- own to filter on.
+--
+-- Standalone migration on purpose, for the same reason as 20260830000001
+-- (`goat_status` → 'stolen') and 20260927000003 (`health_record_type` →
+-- 'dip_wash'): Postgres will not let a value added to an enum by
+-- `ALTER TYPE ... ADD VALUE` be used later in the SAME transaction. Do not fold
+-- other DDL into this file. Nothing here writes a `dip_wash` row — the category
+-- starts EMPTY by design and the owner fills it via the combobox's "+ Add new",
+-- the same rule as every other drug list in this project (no invented product
+-- names) — so there is no follow-up migration.
+--
+-- Additive and idempotent: existing rows and the other five enum values are
+-- untouched. No RLS change: `inventory_items` keeps its single owner policy.
+
+alter type medicine_category add value if not exists 'dip_wash';

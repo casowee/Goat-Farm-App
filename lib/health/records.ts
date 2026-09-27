@@ -12,6 +12,10 @@ export const HEALTH_RECORD_TYPES = [
   "checkup",
   "injury",
   "surgery",
+  // UPD-016 — external parasite control (dipping / washing). Added last to
+  // match the order Postgres reports the enum in after `ALTER TYPE ... ADD
+  // VALUE`, so this list and the generated types stay in step.
+  "dip_wash",
 ] as const;
 
 export type HealthRecordType = (typeof HEALTH_RECORD_TYPES)[number];
@@ -43,6 +47,11 @@ export const FOLLOW_UP_RECORD_TYPES: readonly HealthRecordType[] = [
   "vaccination",
   "deworming",
   "checkup",
+  // UPD-016 — dip wash is recurring care, not a treatment course: it gets the
+  // date-given + next-due-date pair, never the medication/course fields. Adding
+  // it here is what puts it on the Schedule tab and the dashboard Due soon
+  // widget, because both read `next_due_date`.
+  "dip_wash",
 ];
 
 export const HEALTH_RECORD_TYPE_LABELS: Record<HealthRecordType, string> = {
@@ -53,6 +62,7 @@ export const HEALTH_RECORD_TYPE_LABELS: Record<HealthRecordType, string> = {
   checkup: "Checkup",
   injury: "Injury",
   surgery: "Surgery",
+  dip_wash: "Dip Wash",
 };
 
 export const HEALTH_RECORD_STATUS_LABELS: Record<HealthRecordStatus, string> = {

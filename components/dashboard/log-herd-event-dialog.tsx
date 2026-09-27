@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2, Plus } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
+import { Plus } from "lucide-react";
 import { createHerdEvent } from "@/app/(app)/actions";
 import {
   Dialog,
@@ -51,16 +51,6 @@ function requiresGoat(eventType: string): boolean {
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function SubmitButton({ disabled }: { disabled: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={disabled || pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Saving..." : "Log event"}
-    </Button>
-  );
 }
 
 /**
@@ -211,7 +201,7 @@ export function LogHerdEventDialog({ goats }: { goats: GoatOption[] }) {
             >
               Cancel
             </Button>
-            <SubmitButton disabled={!canSubmit} />
+            <SubmitButton disabled={!canSubmit}>Log event</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2, Trash2 } from "lucide-react";
+import { SubmitButton } from "@/components/forms/submit-button";
+import { Trash2 } from "lucide-react";
 import { deleteBreedingSeason } from "@/app/(app)/breeding/actions";
 import {
   Dialog,
@@ -14,17 +14,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" variant="destructive" disabled={pending}>
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? "Deleting..." : "Delete"}
-    </Button>
-  );
-}
 
 export function DeleteSeasonDialog({
   seasonId,
@@ -67,7 +56,9 @@ export function DeleteSeasonDialog({
         <form action={formAction}>
           {error && <p className="mb-2 text-sm text-error">{error}</p>}
           <DialogFooter showCloseButton>
-            <SubmitButton />
+            <SubmitButton variant="destructive" pendingLabel="Deleting…">
+              Delete
+            </SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

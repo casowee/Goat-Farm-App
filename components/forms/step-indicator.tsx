@@ -65,7 +65,7 @@ export function StepIndicator({
                 onClick={() => onStepSelect?.(i)}
                 aria-label={`Go to step ${i + 1}: ${s.label}`}
                 aria-current={i === index ? "step" : undefined}
-                className="flex flex-1 items-center py-2"
+                className="tappable flex flex-1 items-center py-2"
               >
                 <span className={barClass} />
               </button>

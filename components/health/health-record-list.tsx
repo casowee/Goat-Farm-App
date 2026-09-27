@@ -17,6 +17,7 @@ import {
 } from "@/lib/health/records";
 import { HealthRecordFormDialog } from "@/components/health/health-record-form-dialog";
 import { DeleteHealthRecordDialog } from "@/components/health/delete-health-record-dialog";
+import { MarkEffectiveToggle } from "@/components/health/mark-effective-toggle";
 
 function courseSummary(record: HealthRecord): string | null {
   // Deworming carries just a product name (UPD-005 amendment), no schedule.
@@ -139,6 +140,16 @@ export function HealthRecordList({
                     Cost: {record.cost}
                   </span>
                 )}
+                {/*
+                  Spec 15 (§6) — the same toggle, the same server action and the
+                  same `marked_effective` column the Doctor condition page uses.
+                  Marking a treatment effective here and marking it there are
+                  one operation on one flag, so the two views cannot disagree.
+                */}
+                <MarkEffectiveToggle
+                  recordId={record.id}
+                  effective={record.marked_effective}
+                />
                 <div className="ml-auto flex gap-2">
                   <HealthRecordFormDialog
                     goatId={goatId}

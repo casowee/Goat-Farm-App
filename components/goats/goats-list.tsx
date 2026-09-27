@@ -424,7 +424,7 @@ function GoatTable({
                   <div className="flex items-center gap-1.5">
                     <Link
                       href={`/goats/${goat.id}`}
-                      className="font-medium text-copy-primary hover:text-brand"
+                      className="tappable-inline font-medium text-copy-primary hover:text-brand"
                     >
                       {goat.name ?? goat.tag}
                     </Link>
@@ -479,7 +479,7 @@ function GoatTable({
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-1.5">
-                  <Link href={`/goats/${goat.id}`} className="hover:text-brand">
+                  <Link href={`/goats/${goat.id}`} className="tappable-inline hover:text-brand">
                     {goat.name ?? goat.tag}
                   </Link>
                   {goat.is_temp_tag && <TempTagBadge />}
@@ -559,7 +559,7 @@ function DuplicatesView({
                 <div className="flex flex-col">
                   <Link
                     href={`/goats/${goat.id}?from=duplicates`}
-                    className="font-medium text-copy-primary hover:text-brand"
+                    className="tappable-inline font-medium text-copy-primary hover:text-brand"
                   >
                     {goat.name ?? goat.tag}
                   </Link>

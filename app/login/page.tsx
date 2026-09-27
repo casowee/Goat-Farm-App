@@ -1,10 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
+import { SubmitButton } from "@/components/forms/submit-button";
 import { login } from "./actions";
-import { LoadingDots } from "@/components/loading/loading-dots";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -13,19 +11,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" size="lg" className="w-full" disabled={pending}>
-      {pending && (
-        <LoadingDots size="sm" label="Signing in…" className="text-primary-foreground" />
-      )}
-      {pending ? "Signing in..." : "Sign in"}
-    </Button>
-  );
-}
 
 export default function LoginPage() {
   const [error, formAction] = useActionState(
@@ -71,7 +56,9 @@ export default function LoginPage() {
               />
             </div>
             {error && <p className="text-sm text-error">{error}</p>}
-            <SubmitButton />
+            <SubmitButton size="lg" className="w-full" pendingLabel="Signing in…">
+              Sign in
+            </SubmitButton>
           </form>
         </CardContent>
       </Card>

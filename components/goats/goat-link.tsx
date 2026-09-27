@@ -25,7 +25,7 @@ export function GoatLink({
       href={`/goats/${goat.id}`}
       title={goat.name ? `${goat.tag} — ${goat.name}` : goat.tag}
       className={cn(
-        "text-brand underline underline-offset-2 hover:text-brand/80",
+        "tappable-inline text-brand underline underline-offset-2 hover:text-brand/80",
         className,
       )}
     >
