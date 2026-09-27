@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  listHealthRecordsPageByGoat,
+  type HealthRecord,
+} from "@/lib/health/queries";
 import type { Database } from "@/types/database.types";
 import {
   type HealthRecordStatus,
@@ -14,11 +18,14 @@ import {
 
 type HealthRecordInsert =
   Database["public"]["Tables"]["health_records"]["Insert"];
-export type HealthRecord =
-  Database["public"]["Tables"]["health_records"]["Row"];
 
-export type HealthConditionPreset =
-  Database["public"]["Tables"]["health_condition_presets"]["Row"];
+// Spec 17.2 (§5F) — the reads moved to `lib/health/queries.ts` so they can be
+// wrapped in React `cache()` and are no longer exported as server actions.
+// The row types are re-exported here so existing importers keep working.
+export type {
+  HealthRecord,
+  HealthConditionPreset,
+} from "@/lib/health/queries";
 
 function str(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value.trim() : "";
@@ -248,23 +255,6 @@ function newMedicineCategoryFor(
   return recordType === "deworming" ? "dewormer" : null;
 }
 
-/**
- * Every health-condition preset visible to the signed-in owner: the seeded
- * global defaults (`owner_id is null`) plus the owner's own custom presets.
- * RLS enforces that scoping; the combobox filters by `record_type` client-side.
- */
-export async function listHealthConditionPresets(): Promise<
-  HealthConditionPreset[]
-> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("health_condition_presets")
-    .select("*")
-    .order("name");
-
-  return data ?? [];
-}
-
 export async function createHealthRecord(
   formData: FormData,
 ): Promise<string | undefined> {
@@ -368,19 +358,13 @@ export async function deleteHealthRecord(
 }
 
 /**
- * All of a goat's health records, newest event first. RLS scopes this to the
- * signed-in owner. Spec 07, Section 8.
+ * Spec 17.2 (§5E) — the "Show more" server action for the Health tab: the next
+ * page of this goat's records, newest first. RLS scopes it to the signed-in
+ * owner, exactly like the first page rendered on the server.
  */
-export async function listHealthRecordsByGoat(
+export async function loadMoreHealthRecords(
   goatId: number,
+  offset: number,
 ): Promise<HealthRecord[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("health_records")
-    .select("*")
-    .eq("goat_id", goatId)
-    .order("date_occurred", { ascending: false })
-    .order("id", { ascending: false });
-
-  return data ?? [];
+  return listHealthRecordsPageByGoat(goatId, offset);
 }

@@ -160,7 +160,7 @@ so a **single continuous form in the dialog is correct** — a wizard would be o
 Re-checked at phone width: three short fields fit with no oppressive scroll. (Contrast with 07, whose
 illness/treatment path genuinely needed the wizard.)
 
-## 9. Open Questions for Ismail
+## 9. Open Questions for the User
 
 Resolve, don't guess. If the owner declines to pre-decide, the agent resolves each toward the smallest,
 most reversible, convention-consistent choice and records it in Section 11.

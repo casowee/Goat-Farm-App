@@ -18,7 +18,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Database } from "@/types/database.types";
 
-type Barn = Database["public"]["Tables"]["barns"]["Row"];
+// Spec 17.2 (§5A) — the editable fields only; the barns list no longer
+// selects `*`.
+type Barn = Pick<
+  Database["public"]["Tables"]["barns"]["Row"],
+  "id" | "name" | "category" | "notes"
+>;
 
 interface BarnFormDialogProps {
   barn?: Barn;

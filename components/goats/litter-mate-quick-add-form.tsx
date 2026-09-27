@@ -150,27 +150,7 @@ export function LitterMateQuickAddForm({
   );
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1 rounded-xl border border-surface-border bg-subtle p-3 text-sm">
-        <p className="text-copy-secondary">
-          Dam:{" "}
-          <span className="text-copy-primary">
-            {dam.name ? `${dam.tag} — ${dam.name}` : dam.tag}
-          </span>
-        </p>
-        <p className="text-copy-secondary">
-          Origin: <span className="text-copy-primary">Born on the farm</span>
-        </p>
-        <p className="text-copy-secondary">
-          Date of birth: <span className="text-copy-primary">{dateOfBirth}</span>
-        </p>
-        <p className="text-copy-secondary">
-          Barn: <span className="text-copy-primary">{barn.name}</span>
-        </p>
-        <p className="text-xs text-copy-muted">
-          Locked to match the first kid in this litter.
-        </p>
-      </div>
+    <form action={formAction} className="flex min-h-0 flex-1 flex-col gap-4">
       <input type="hidden" name="origin" value="born_here" />
       <input type="hidden" name="date_of_birth" value={dateOfBirth} />
       <input type="hidden" name="dam_id" value={String(dam.id)} />
@@ -188,174 +168,206 @@ export function LitterMateQuickAddForm({
         value={JSON.stringify(resolvedComposition ?? [])}
       />
 
-      <p className="text-xs text-copy-muted">
-        Temporary tag: <span className="text-copy-secondary">{tag}</span> — you
-        can assign a real tag later by editing this goat.
-      </p>
-
-      <div className="flex flex-col gap-2">
-        <label className="text-sm text-copy-secondary">Sex</label>
-        <Select
-          name="sex"
-          value={sex}
-          onValueChange={(value) => setSex((value as GoatSex) ?? "")}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select sex" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="female">Female</SelectItem>
-            <SelectItem value="male">Male</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <ParentPicker
-        label="Sire"
-        fieldPrefix="sire"
-        goats={goats}
-        preferredSex="male"
-        defaultMode="in_system"
-        initialGoatId={initialSire.goatId}
-        initialName={initialSire.name}
-        onSelectionChange={setSireSel}
-      />
-
-      <div className="flex flex-col gap-2">
-        <label className="text-sm text-copy-secondary">Breed</label>
-
-        {bothParentsInSystem && (
-          <ToggleGroup
-            value={[breedSource]}
-            onValueChange={(values) => {
-              const next = values[0];
-              if (next === "parents") setUseParentsBreed(true);
-              if (next === "manual") setUseParentsBreed(false);
-            }}
-            variant="outline"
-            className="w-full"
-          >
-            <ToggleGroupItem value="manual" className="flex-1">
-              Enter manually
-            </ToggleGroupItem>
-            <ToggleGroupItem value="parents" className="flex-1">
-              Use parents&apos; breed
-            </ToggleGroupItem>
-          </ToggleGroup>
-        )}
-
-        {breedSource === "parents" ? (
-          <p className="text-sm text-copy-secondary">
-            Computed from the sire and dam:{" "}
+      {/*
+        UPD-013 iPhone fix — the FIELDS scroll inside whatever height is left
+        over, so the action row below can never be pushed off screen (it is a
+        flex sibling, not something you scroll past). The dialog itself is
+        capped to the VISIBLE viewport — see components/ui/dialog.tsx — so the
+        iOS keyboard shrinks this area instead of hiding the buttons.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-1 rounded-xl border border-surface-border bg-subtle p-3 text-sm">
+          <p className="text-copy-secondary">
+            Dam:{" "}
             <span className="text-copy-primary">
-              {parentsComputed.length > 0 ? formatBreed(parentsComputed) : "—"}
+              {dam.name ? `${dam.tag} — ${dam.name}` : dam.tag}
             </span>
           </p>
-        ) : (
-          <>
-            <Select
-              items={BREED_SELECT_ITEMS}
-              value={breedChoice}
-              onValueChange={(value) => setBreedChoice(value ?? "")}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a breed" />
-              </SelectTrigger>
-              <SelectContent>
-                {GOAT_BREEDS.map((b) => (
-                  <SelectItem key={b} value={b}>
-                    {b}
-                  </SelectItem>
-                ))}
-                <SelectItem value={CROSSED_BREED}>Crossed…</SelectItem>
-                <SelectItem value={OTHER_BREED}>Other…</SelectItem>
-              </SelectContent>
-            </Select>
-            {breedChoice === OTHER_BREED && (
-              <Input
-                aria-label="Other breed"
-                placeholder="Enter breed"
-                value={otherBreed}
-                onChange={(e) => setOtherBreed(e.target.value)}
-              />
-            )}
-          </>
-        )}
-
-        {breedSource === "manual" && isCrossed && (
-          <div className="flex flex-col gap-2 rounded-xl border border-surface-border p-3">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm text-copy-secondary">
-                First parent breed
-              </label>
-              <Select
-                items={PURE_BREED_ITEMS}
-                value={crossFirst}
-                onValueChange={(value) => setCrossFirst(value ?? "")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a breed" />
-                </SelectTrigger>
-                <SelectContent>
-                  {GOAT_BREEDS.map((b) => (
-                    <SelectItem key={b} value={b}>
-                      {b}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm text-copy-secondary">
-                Second parent breed
-              </label>
-              <Select
-                items={PURE_BREED_ITEMS}
-                value={crossSecond}
-                onValueChange={(value) => setCrossSecond(value ?? "")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a breed" />
-                </SelectTrigger>
-                <SelectContent>
-                  {GOAT_BREEDS.map((b) => (
-                    <SelectItem key={b} value={b}>
-                      {b}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {crossFirst && crossSecond && crossFirst === crossSecond && (
-              <p className="text-xs text-error">
-                The two parent breeds must be different.
-              </p>
-            )}
-          </div>
-        )}
-
-        {resolvedComposition && breedSource === "manual" && (
-          <p className="text-xs text-copy-muted">
-            = {formatBreed(resolvedComposition)}
+          <p className="text-copy-secondary">
+            Origin: <span className="text-copy-primary">Born on the farm</span>
           </p>
-        )}
-      </div>
+          <p className="text-copy-secondary">
+            Date of birth:{" "}
+            <span className="text-copy-primary">{dateOfBirth}</span>
+          </p>
+          <p className="text-copy-secondary">
+            Barn: <span className="text-copy-primary">{barn.name}</span>
+          </p>
+          <p className="text-xs text-copy-muted">
+            Locked to match the first kid in this litter.
+          </p>
+        </div>
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="qa-notes" className="text-sm text-copy-secondary">
-          Notes
-        </label>
-        <Textarea
-          id="qa-notes"
-          name="notes"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+        <p className="text-xs text-copy-muted">
+          Temporary tag: <span className="text-copy-secondary">{tag}</span> —
+          you can assign a real tag later by editing this goat.
+        </p>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-sm text-copy-secondary">Sex</label>
+          <Select
+            name="sex"
+            value={sex}
+            onValueChange={(value) => setSex((value as GoatSex) ?? "")}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select sex" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="female">Female</SelectItem>
+              <SelectItem value="male">Male</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <ParentPicker
+          label="Sire"
+          fieldPrefix="sire"
+          goats={goats}
+          preferredSex="male"
+          defaultMode="in_system"
+          initialGoatId={initialSire.goatId}
+          initialName={initialSire.name}
+          onSelectionChange={setSireSel}
         />
+
+        <div className="flex flex-col gap-2">
+          <label className="text-sm text-copy-secondary">Breed</label>
+
+          {bothParentsInSystem && (
+            <ToggleGroup
+              value={[breedSource]}
+              onValueChange={(values) => {
+                const next = values[0];
+                if (next === "parents") setUseParentsBreed(true);
+                if (next === "manual") setUseParentsBreed(false);
+              }}
+              variant="outline"
+              className="w-full"
+            >
+              <ToggleGroupItem value="manual" className="flex-1">
+                Enter manually
+              </ToggleGroupItem>
+              <ToggleGroupItem value="parents" className="flex-1">
+                Use parents&apos; breed
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
+
+          {breedSource === "parents" ? (
+            <p className="text-sm text-copy-secondary">
+              Computed from the sire and dam:{" "}
+              <span className="text-copy-primary">
+                {parentsComputed.length > 0 ? formatBreed(parentsComputed) : "—"}
+              </span>
+            </p>
+          ) : (
+            <>
+              <Select
+                items={BREED_SELECT_ITEMS}
+                value={breedChoice}
+                onValueChange={(value) => setBreedChoice(value ?? "")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a breed" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GOAT_BREEDS.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {b}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={CROSSED_BREED}>Crossed…</SelectItem>
+                  <SelectItem value={OTHER_BREED}>Other…</SelectItem>
+                </SelectContent>
+              </Select>
+              {breedChoice === OTHER_BREED && (
+                <Input
+                  aria-label="Other breed"
+                  placeholder="Enter breed"
+                  value={otherBreed}
+                  onChange={(e) => setOtherBreed(e.target.value)}
+                />
+              )}
+            </>
+          )}
+
+          {breedSource === "manual" && isCrossed && (
+            <div className="flex flex-col gap-2 rounded-xl border border-surface-border p-3">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm text-copy-secondary">
+                  First parent breed
+                </label>
+                <Select
+                  items={PURE_BREED_ITEMS}
+                  value={crossFirst}
+                  onValueChange={(value) => setCrossFirst(value ?? "")}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a breed" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GOAT_BREEDS.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {b}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm text-copy-secondary">
+                  Second parent breed
+                </label>
+                <Select
+                  items={PURE_BREED_ITEMS}
+                  value={crossSecond}
+                  onValueChange={(value) => setCrossSecond(value ?? "")}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a breed" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GOAT_BREEDS.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {b}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {crossFirst && crossSecond && crossFirst === crossSecond && (
+                <p className="text-xs text-error">
+                  The two parent breeds must be different.
+                </p>
+              )}
+            </div>
+          )}
+
+          {resolvedComposition && breedSource === "manual" && (
+            <p className="text-xs text-copy-muted">
+              = {formatBreed(resolvedComposition)}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="qa-notes" className="text-sm text-copy-secondary">
+            Notes
+          </label>
+          <Textarea
+            id="qa-notes"
+            name="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </div>
+
+        {error && <p className="text-sm text-error">{error}</p>}
       </div>
 
-      {error && <p className="text-sm text-error">{error}</p>}
-
-      <div className="flex justify-between gap-2 border-t border-surface-border pt-4">
+      {/* Always on screen: a fixed-size flex sibling below the scroll area. */}
+      <div className="flex shrink-0 justify-between gap-2 border-t border-surface-border pt-4">
         <Button type="button" variant="ghost" onClick={onCancel}>
           Back
         </Button>

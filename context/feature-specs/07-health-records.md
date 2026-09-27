@@ -120,7 +120,7 @@ Spec 07's only responsibility toward this contract: keep `status` accurate (`act
 - Server actions: `createHealthRecord`, `updateHealthRecord`, `deleteHealthRecord`, `listHealthRecordsByGoat`
 - Dialog form component following the existing goat/barn dialog pattern
 
-## 9. Open Questions for Ismail
+## 9. Open Questions for the User
 
 1. Should the **global Health Records page** (all goats, filterable) ship in v1, or is the per-goat tab enough for now?
    → **Resolved 2026-08-29 (owner): defer it.** Per-goat Health tab only for v1; `/health` keeps its placeholder. Revisit alongside the analytics dashboard (Spec 13/14).

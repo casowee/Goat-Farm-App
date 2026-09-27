@@ -52,7 +52,37 @@ import { LitterMateQuickAddForm } from "@/components/goats/litter-mate-quick-add
 import { findTagMatches } from "@/lib/goats/tag";
 import { generateTempTag } from "@/lib/goats/temp-tag";
 
-type Goat = Database["public"]["Tables"]["goats"]["Row"];
+// Spec 17.2 (§5A) — the editable fields only, not the whole row. The list and
+// detail screens no longer `select('*')`, so this states exactly which columns
+// the edit form depends on: trimming one of them out of a query becomes a type
+// error here instead of a silently blank field.
+type Goat = Pick<
+  Database["public"]["Tables"]["goats"]["Row"],
+  | "id"
+  | "tag"
+  | "name"
+  | "date_of_birth"
+  | "sex"
+  | "reproductive_state"
+  | "origin"
+  | "purchase_date"
+  | "is_temp_tag"
+  | "barn_id"
+  | "sire_id"
+  | "sire_name"
+  | "dam_id"
+  | "dam_name"
+  | "status"
+  | "notes"
+>;
+/**
+ * The same editable-field set, exported for callers that have to *pass* a goat to
+ * this dialog and want the compiler to hold them to the exact column list — added
+ * by spec 17.3 (§5D), where the goat header’s action cluster became its own
+ * streamed component and needed to name the shape it forwards.
+ */
+export type GoatFormGoat = Goat;
+
 type GoatOrigin = Database["public"]["Enums"]["goat_origin"];
 
 interface GoatFormDialogProps {
@@ -450,13 +480,15 @@ export function GoatFormDialog({
         </DialogHeader>
 
         {isNewborn && phase !== "wizard" ? (
-          <div className="flex flex-col gap-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-4">
             {addedSoFar.length > 0 && (
               <div className="flex flex-col gap-1.5 rounded-xl border border-surface-border bg-subtle p-3">
                 <p className="text-xs font-medium tracking-wide text-copy-muted uppercase">
                   Added so far
                 </p>
-                <p className="text-sm text-copy-primary">
+                {/* Capped so a long litter can't grow this box tall enough to
+                    push the form's Save button out of view on a phone. */}
+                <p className="max-h-20 overflow-y-auto text-sm text-copy-primary">
                   {addedSoFar
                     .map(
                       (kid) =>
@@ -525,7 +557,7 @@ export function GoatFormDialog({
 
             <form
           action={formAction}
-          className="flex flex-col gap-4"
+          className="flex min-h-0 flex-1 flex-col gap-4"
           onKeyDown={(e) => {
             // Enter should only submit from the final step; on earlier steps it
             // would otherwise fire the single final submit prematurely.
@@ -539,7 +571,9 @@ export function GoatFormDialog({
             }
           }}
         >
-          <div className="flex max-h-[58vh] flex-col gap-4 overflow-y-auto pr-1">
+          {/* The steps scroll in whatever height is left; the nav row below
+              stays on screen (UPD-013 iPhone fix). */}
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
             {/* Step 1 — Identity & Origin */}
             <div className={stepClass(0)}>
               <div className="flex flex-col gap-2">
@@ -1040,7 +1074,9 @@ export function GoatFormDialog({
 
           {error && <p className="text-sm text-error">{error}</p>}
 
-          <div className="border-t border-surface-border pt-4">
+          {/* Always on screen: a fixed-size flex sibling below the scroll area,
+              so Save/Next can never end up under the iOS keyboard (UPD-013). */}
+          <div className="shrink-0 border-t border-surface-border pt-4">
             {wizard.isLast ? (
               <WizardNav onBack={wizard.back}>
                 <SubmitButton

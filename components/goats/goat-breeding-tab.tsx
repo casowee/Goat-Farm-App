@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { listBarns, listHerdGoats } from "@/lib/goats/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DoeCard } from "@/components/breeding/doe-performance-list";
 import {
@@ -99,7 +100,7 @@ export async function loadGoatBreedingTabData(
       { data: allBuckLinks },
       { data: templateRows },
       { data: settingsRow },
-      { data: barnRows },
+      barnRows,
     ] = await Promise.all([
       supabase
         .from("breeding_season_occurrences")
@@ -114,7 +115,10 @@ export async function loadGoatBreedingTabData(
         .from("breeding_season_templates")
         .select("id, label, start_month, length_months"),
       supabase.from("breeding_settings").select("gestation_days").maybeSingle(),
-      supabase.from("barns").select("id, name"),
+      // Spec 17.2 (§5F) — the goat-detail page already fetched the barns for
+      // its own header; `cache()` makes this reuse that result instead of
+      // issuing a second identical query in the same render.
+      listBarns(),
     ]);
 
     const buckIds = [
@@ -137,7 +141,7 @@ export async function loadGoatBreedingTabData(
     const templateById = new Map(
       (templateRows ?? []).map((t) => [t.id, t as SeasonTemplate]),
     );
-    const barnById = new Map((barnRows ?? []).map((b) => [b.id, b.name]));
+    const barnById = new Map(barnRows.map((b) => [b.id, b.name]));
     const gestationDays =
       settingsRow?.gestation_days ?? DEFAULT_BREEDING_SETTINGS.gestation_days;
 
@@ -164,7 +168,7 @@ export async function loadGoatBreedingTabData(
   // Doe.
   const [
     { data: settingsRow },
-    { data: allGoats },
+    allGoats,
     { data: noteRows },
     { data: breedingSettingsRow },
   ] = await Promise.all([
@@ -172,11 +176,13 @@ export async function loadGoatBreedingTabData(
       .from("doe_performance_settings")
       .select("max_expected_interval_months, breeding_eligible_age_months")
       .maybeSingle(),
-    supabase
-      .from("goats")
-      .select(
-        "id, tag, name, sex, reproductive_state, date_of_birth, status, dam_id",
-      ),
+    // Spec 17.2 (§5F) — the goat-detail page already fetched the owner's whole
+    // goat list for the pedigree walk and the parent pickers. `listHerdGoats()`
+    // is `cache()`d, so asking again here costs nothing instead of repeating a
+    // full-herd query in the same render. The kidding-event derivation needs
+    // every goat (including sold / deceased / stolen kids), so this must stay
+    // unpaginated — it is a full-history computation (§2).
+    listHerdGoats(),
     supabase
       .from("doe_performance_notes")
       .select("id, category, note, created_at")
@@ -194,7 +200,7 @@ export async function loadGoatBreedingTabData(
       }
     : DEFAULT_DOE_PERFORMANCE_SETTINGS;
 
-  const herd = (allGoats ?? []) as DoePerformanceGoat[];
+  const herd = allGoats as DoePerformanceGoat[];
   const thisDoe: DoePerformanceGoat = {
     id: goat.id,
     tag: goat.tag,

@@ -91,6 +91,66 @@
     animation: dot-pulse 1s ease-in-out infinite;
 }
 
+/* Spec 17.3 (§5F) — skeleton screens.
+   The pulse is defined here rather than reusing Tailwind’s `animate-pulse` so
+   the reduced-motion rule can live with it: a utility that silences itself is
+   reliable, whereas a separate `@media` override has to win a cascade fight
+   against a layered utility class. */
+@keyframes skeleton-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.45;
+    }
+}
+
+@utility animate-skeleton-pulse {
+    animation: skeleton-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+    /* §5F — under reduced motion the placeholder is static, not pulsing. */
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+/* §5F anti-flash: a skeleton region starts fully transparent and only fades in
+   after ~150 ms. Data that arrives faster than that unmounts the region before
+   the animation ever runs, so a quick navigation shows no placeholder at all
+   instead of a one-frame flicker. `forwards` holds the end state so a slow load
+   stays visible rather than snapping back to transparent. */
+@keyframes skeleton-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@utility skeleton-fade {
+    opacity: 0;
+    animation: skeleton-fade-in 150ms ease-out 150ms forwards;
+
+    /* Reduced motion still needs the anti-flash delay — that is a timing
+       decision, not a motion effect — so the delay is kept and only the
+       fade itself is dropped. */
+    @media (prefers-reduced-motion: reduce) {
+        animation: skeleton-fade-in 1ms linear 150ms forwards;
+    }
+}
+
+/* §5F — UPD-015’s loading dots are motion too; still them under the same
+   preference rather than leaving one animation running. */
+@media (prefers-reduced-motion: reduce) {
+    .animate-dot-pulse {
+        animation: none;
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
 :root {
     /* Desert palette (dark theme only, see context/ui-context.md) */
     --bg-base: #0b0a09;

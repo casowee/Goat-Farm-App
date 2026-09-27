@@ -9,40 +9,13 @@ import {
 } from "@/lib/inventory/items";
 import { isKnownUnit } from "@/lib/inventory/units";
 
-export type InventoryItem =
-  Database["public"]["Tables"]["inventory_items"]["Row"];
+// Spec 17.2 (§5F) — the reads moved to `lib/inventory/queries.ts` so they can
+// be wrapped in React `cache()` and are no longer exported as server actions.
+// The row type is re-exported here so existing importers keep working.
+export type { InventoryItem } from "@/lib/inventory/queries";
 
 type InventoryItemInsert =
   Database["public"]["Tables"]["inventory_items"]["Insert"];
-
-/**
- * UPD-005 — the owner's medicine catalogue, powering the health-record
- * Treatment / Deworming medication comboboxes. RLS scopes this to the signed-in
- * owner. `type = 'medicine'` only. Spec 10 adds the feed side and the CRUD
- * below, but this reader's contract is unchanged — the comboboxes depend on it.
- */
-export async function listMedicineItems(): Promise<InventoryItem[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("inventory_items")
-    .select("*")
-    .eq("type", "medicine")
-    .order("name");
-
-  return data ?? [];
-}
-
-/** Every inventory item the signed-in owner has, medicine and feed. */
-export async function listInventoryItems(): Promise<InventoryItem[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("inventory_items")
-    .select("*")
-    .order("type")
-    .order("name");
-
-  return data ?? [];
-}
 
 type ParsedFields =
   | { error: string }

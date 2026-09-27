@@ -2,9 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  listWeightsPageByGoat,
+  type WeightWithDelta,
+} from "@/lib/weight/queries";
 import type { Database } from "@/types/database.types";
 
-export type Weight = Database["public"]["Tables"]["weights"]["Row"];
+// Spec 17.2 (§5F) — the reads moved to `lib/weight/queries.ts` so they can be
+// wrapped in React `cache()` and are no longer exported as server actions.
+// The row type is re-exported here so existing importers keep working.
+export type { Weight } from "@/lib/weight/queries";
+
 type WeightInsert = Database["public"]["Tables"]["weights"]["Insert"];
 
 function str(value: FormDataEntryValue | null): string {
@@ -128,18 +136,13 @@ export async function deleteWeight(
 }
 
 /**
- * A goat's weigh-ins, **oldest-first** (`weighed_on asc, id asc`) — the order
- * the growth chart and the "change since last" column both want. RLS scopes
- * this to the signed-in owner. Spec 08, Section 7.
+ * Spec 17.2 (§5E) — the "Show more" server action for the Weight tab: the next
+ * page of this goat's weigh-ins, newest first. RLS scopes it to the signed-in
+ * owner, exactly like the first page rendered on the server.
  */
-export async function listWeightsByGoat(goatId: number): Promise<Weight[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("weights")
-    .select("*")
-    .eq("goat_id", goatId)
-    .order("weighed_on", { ascending: true })
-    .order("id", { ascending: true });
-
-  return data ?? [];
+export async function loadMoreWeights(
+  goatId: number,
+  offset: number,
+): Promise<WeightWithDelta[]> {
+  return listWeightsPageByGoat(goatId, offset);
 }

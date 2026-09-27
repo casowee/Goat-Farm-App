@@ -1,9 +1,8 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, PawPrint } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { GoatFormDialog } from "@/components/goats/goat-form-dialog";
-import { RemoveGoatDialog } from "@/components/goats/remove-goat-dialog";
 import { GoatStageBadge } from "@/components/goats/goat-stage-badge";
 import { TempTagBadge } from "@/components/goats/temp-tag-badge";
 import { Button } from "@/components/ui/button";
@@ -11,28 +10,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ageInMonths } from "@/lib/goats/stage";
 import { formatBreed } from "@/lib/goats/breeds";
-import { buildPedigree, type PedigreeGoatRow } from "@/lib/goats/pedigree";
-import { PedigreeView } from "@/components/goats/pedigree-view";
-import { MoveBarnDialog } from "@/components/goats/move-barn-dialog";
-import {
-  BarnMoveHistory,
-  type BarnMove,
-} from "@/components/goats/barn-move-history";
-import { HealthRecordFormDialog } from "@/components/health/health-record-form-dialog";
-import { HealthRecordList } from "@/components/health/health-record-list";
-import {
-  listHealthConditionPresets,
-  listHealthRecordsByGoat,
-} from "@/app/(app)/health/actions";
-import { listMedicineItems } from "@/app/(app)/inventory/actions";
-import { WeightFormDialog } from "@/components/weight/weight-form-dialog";
-import { WeightGrowthChart } from "@/components/weight/weight-growth-chart";
-import { WeightHistoryList } from "@/components/weight/weight-history-list";
-import { listWeightsByGoat } from "@/app/(app)/weight/actions";
-import {
-  GoatBreedingTab,
-  loadGoatBreedingTabData,
-} from "@/components/goats/goat-breeding-tab";
+import { SkeletonCard } from "@/components/skeletons/skeleton-card";
+import { SkeletonTabPanel } from "@/components/skeletons/skeleton-tabs";
+import { SkeletonGoatHeaderActions } from "@/components/skeletons/skeleton-goat-header";
+import { GoatHeaderActions } from "@/components/goats/sections/goat-header-actions";
+import { GoatBarnMovesSection } from "@/components/goats/sections/goat-barn-moves-section";
+import { GoatHealthTabSection } from "@/components/goats/sections/goat-health-tab-section";
+import { GoatWeightTabSection } from "@/components/goats/sections/goat-weight-tab-section";
+import { GoatBreedingTabSection } from "@/components/goats/sections/goat-breeding-tab-section";
+import { GoatLineageTabSection } from "@/components/goats/sections/goat-lineage-tab-section";
+
+// Spec 17.2 (§5A) — the columns this page renders plus the ones the edit
+// dialog needs, instead of `select('*')`. `breed`, `photo_url`, `created_at`,
+// `updated_at` and `owner_id` were being fetched and thrown away.
+// Written as one literal, not concatenated: the Supabase client infers the row
+// type from the literal, so splitting it across `+` would erase the generated
+// types for this query.
+const GOAT_DETAIL_COLUMNS =
+  "id, tag, name, date_of_birth, sex, reproductive_state, origin, purchase_date, is_temp_tag, barn_id, sire_id, sire_name, dam_id, dam_name, status, notes, barn:barns(id, name), breed_composition:goat_breed_composition(breed, pct)";
 
 function formatAge(dateOfBirth: string): string {
   const months = ageInMonths(dateOfBirth);
@@ -47,6 +42,25 @@ function formatAge(dateOfBirth: string): string {
     : `${yearsLabel}, ${remainingMonths} month${remainingMonths === 1 ? "" : "s"} old`;
 }
 
+/**
+ * Spec 17.3 (§5D) — the goat profile, with the header ahead of everything else.
+ *
+ * **This page awaits exactly one query: the goat row.** That row is what the page
+ * cannot exist without (a missing one is a 404), and it is enough to draw the
+ * whole header — tag, name, age via `formatAge()`, stage badge, status, barn,
+ * breed, origin, notes. So the owner sees the goat they tapped almost at once.
+ *
+ * Everything else streams behind its own `<Suspense>`: the header's action
+ * buttons (they need the whole herd for the parent pickers), the barn move
+ * history, and each of the four tab panels. The `TabsList` is static markup and
+ * renders with the header, so the tabs are visible and tappable while their
+ * contents are still arriving.
+ *
+ * No waterfall: the sections are siblings, so React renders them in one pass and
+ * their queries all start together. They read 17.2's `cache()`d helpers, so the
+ * herd list shared by the action cluster, the Lineage tab and the Breeding tab is
+ * fetched once (§5C's rules, applied here per §5D).
+ */
 export default async function GoatDetailPage({
   params,
   searchParams,
@@ -73,9 +87,7 @@ export default async function GoatDetailPage({
   // means either the goat doesn't exist or it isn't this owner's.
   const { data: goat } = await supabase
     .from("goats")
-    .select(
-      "*, barn:barns(id, name), breed_composition:goat_breed_composition(breed, pct)",
-    )
+    .select(GOAT_DETAIL_COLUMNS)
     .eq("id", goatId)
     .maybeSingle();
 
@@ -83,69 +95,8 @@ export default async function GoatDetailPage({
     notFound();
   }
 
-  const { data: barns } = await supabase
-    .from("barns")
-    .select("id, name")
-    .order("name");
-
-  // All the owner's goats — for the sire / dam pickers and the pedigree walk.
-  const { data: allGoats } = await supabase
-    .from("goats")
-    .select(
-      "id, tag, name, sex, status, is_temp_tag, sire_id, dam_id, sire_name, dam_name, breed_composition:goat_breed_composition(breed, pct)",
-    )
-    .order("tag");
-
-  const goatsById = new Map<number, PedigreeGoatRow>(
-    (allGoats ?? []).map((g) => [g.id, g]),
-  );
-  const breedByGoatId = new Map<number, string>(
-    (allGoats ?? [])
-      .filter((g) => (g.breed_composition ?? []).length > 0)
-      .map((g) => [g.id, formatBreed(g.breed_composition)]),
-  );
-  const pedigree = buildPedigree(goat.id, goatsById);
-
-  const { data: barnMoves } = await supabase
-    .from("goat_barn_moves")
-    .select(
-      "id, moved_on, note, from_barn:barns!goat_barn_moves_from_barn_id_fkey(name), to_barn:barns!goat_barn_moves_to_barn_id_fkey(name)",
-    )
-    .eq("goat_id", goatId)
-    .order("moved_on", { ascending: false })
-    .order("id", { ascending: false });
-
-  const healthRecords = await listHealthRecordsByGoat(goatId);
-  const healthPresets = await listHealthConditionPresets();
-  const medicines = await listMedicineItems();
-  const weights = await listWeightsByGoat(goatId);
-
-  // UPD-012 / Feature 09 integration — real content for the Breeding tab,
-  // assembled from the Breeding page's and Doe Performance tab's own pieces.
-  const breedingTabData = await loadGoatBreedingTabData(
-    {
-      id: goat.id,
-      sex: goat.sex,
-      reproductive_state: goat.reproductive_state,
-      date_of_birth: goat.date_of_birth,
-      status: goat.status,
-      tag: goat.tag,
-      name: goat.name,
-    },
-    healthRecords,
-  );
-
-  const parentGoats = (allGoats ?? []).map((g) => ({
-    id: g.id,
-    tag: g.tag,
-    name: g.name,
-    sex: g.sex,
-    status: g.status,
-    is_temp_tag: g.is_temp_tag,
-    composition: g.breed_composition ?? [],
-  }));
-
   const label = goat.name ?? goat.tag;
+  const breedComposition = goat.breed_composition ?? [];
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -185,46 +136,20 @@ export default async function GoatDetailPage({
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex flex-wrap justify-end gap-2">
-              <GoatFormDialog
-                goat={goat}
-                breedComposition={goat.breed_composition ?? []}
-                barns={barns ?? []}
-                goats={parentGoats}
-                triggerLabel="Edit"
-                triggerVariant="outline"
-              />
-              {goat.sex === "female" && (
-                <GoatFormDialog
-                  newbornDam={{ id: goat.id, tag: goat.tag }}
-                  breedComposition={[]}
-                  barns={barns ?? []}
-                  goats={parentGoats}
-                  triggerLabel="Add newborn kid"
-                  triggerIcon
-                  triggerVariant="outline"
-                />
-              )}
-              <MoveBarnDialog
-                goatId={goat.id}
-                currentBarnId={goat.barn_id}
-                barns={barns ?? []}
-              />
-              <RemoveGoatDialog
-                goatId={goat.id}
-                goatLabel={label}
-                causePresets={healthPresets}
-                returnTo={backHref}
-              />
-            </div>
-            {goat.sex === "female" && (
-              <p className="text-xs text-copy-muted">
-                Kidding history is in the{" "}
-                <span className="text-copy-secondary">Breeding</span> tab below.
-              </p>
-            )}
-          </div>
+          {/*
+            §5D — the four action controls need the whole herd (parent pickers),
+            the barn list and the cause-of-death presets, so they stream behind
+            the header text rather than holding it back.
+          */}
+          <Suspense
+            fallback={<SkeletonGoatHeaderActions label="Loading actions…" />}
+          >
+            <GoatHeaderActions
+              goat={{ ...goat, breed_composition: breedComposition }}
+              goatLabel={label}
+              backHref={backHref}
+            />
+          </Suspense>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
@@ -251,9 +176,7 @@ export default async function GoatDetailPage({
           </div>
           <div>
             <p className="text-xs text-copy-muted">Barn</p>
-            <p className="text-sm text-copy-primary">
-              {goat.barn?.name ?? "—"}
-            </p>
+            <p className="text-sm text-copy-primary">{goat.barn?.name ?? "—"}</p>
           </div>
           <div>
             <p className="text-xs text-copy-muted">Origin</p>
@@ -273,17 +196,22 @@ export default async function GoatDetailPage({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm text-copy-secondary">
-            Barn move history
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <BarnMoveHistory moves={(barnMoves ?? []) as BarnMove[]} />
-        </CardContent>
-      </Card>
+      <Suspense
+        fallback={
+          <SkeletonCard
+            contentHeight="h-16"
+            descriptionLines={0}
+            label="Loading barn move history…"
+          />
+        }
+      >
+        <GoatBarnMovesSection goatId={goat.id} />
+      </Suspense>
 
+      {/*
+        The tab bar itself is static markup with no data behind it, so it paints
+        with the header and stays tappable while the panels stream (§5D).
+      */}
       <Tabs defaultValue="health">
         <TabsList>
           <TabsTrigger value="health">Health</TabsTrigger>
@@ -292,70 +220,56 @@ export default async function GoatDetailPage({
           <TabsTrigger value="lineage">Lineage</TabsTrigger>
         </TabsList>
         <TabsContent value="health">
-          <Card>
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-sm text-copy-secondary">
-                Health records
-              </CardTitle>
-              <HealthRecordFormDialog
-                goatId={goat.id}
-                presets={healthPresets}
-                medicines={medicines}
-                triggerLabel="Add health record"
-                triggerIcon
-              />
-            </CardHeader>
-            <CardContent>
-              <HealthRecordList
-                goatId={goat.id}
-                records={healthRecords}
-                presets={healthPresets}
-                medicines={medicines}
-              />
-            </CardContent>
-          </Card>
+          <Suspense
+            fallback={
+              <SkeletonTabPanel rows={4} label="Loading health records…" />
+            }
+          >
+            <GoatHealthTabSection goatId={goat.id} />
+          </Suspense>
         </TabsContent>
         <TabsContent value="weight">
-          <Card>
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-sm text-copy-secondary">Weight</CardTitle>
-              <WeightFormDialog
-                goatId={goat.id}
-                triggerLabel="Add weight"
-                triggerIcon
-              />
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {weights.length > 0 ? (
-                <WeightGrowthChart
-                  points={weights.map((w) => ({
-                    weighed_on: w.weighed_on,
-                    weight_kg: w.weight_kg,
-                  }))}
-                />
-              ) : null}
-              <WeightHistoryList goatId={goat.id} weights={weights} />
-            </CardContent>
-          </Card>
+          <Suspense
+            fallback={<SkeletonTabPanel rows={4} label="Loading weigh-ins…" />}
+          >
+            <GoatWeightTabSection goatId={goat.id} />
+          </Suspense>
         </TabsContent>
         <TabsContent value="breeding">
-          <GoatBreedingTab data={breedingTabData} />
+          <Suspense
+            fallback={
+              <SkeletonTabPanel
+                rows={3}
+                withAction={false}
+                label="Loading breeding history…"
+              />
+            }
+          >
+            <GoatBreedingTabSection
+              goat={{
+                id: goat.id,
+                sex: goat.sex,
+                reproductive_state: goat.reproductive_state,
+                date_of_birth: goat.date_of_birth,
+                status: goat.status,
+                tag: goat.tag,
+                name: goat.name,
+              }}
+            />
+          </Suspense>
         </TabsContent>
         <TabsContent value="lineage">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm text-copy-secondary">
-                Family tree
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <PedigreeView node={pedigree} breedByGoatId={breedByGoatId} />
-              <p className="mt-4 text-xs text-copy-muted">
-                Showing up to 4 generations. Edit this goat to set or change its
-                sire and dam.
-              </p>
-            </CardContent>
-          </Card>
+          <Suspense
+            fallback={
+              <SkeletonTabPanel
+                rows={3}
+                withAction={false}
+                label="Loading family tree…"
+              />
+            }
+          >
+            <GoatLineageTabSection goatId={goat.id} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>

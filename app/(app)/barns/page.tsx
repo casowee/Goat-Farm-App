@@ -11,8 +11,13 @@ import {
 
 export default async function BarnsPage() {
   const supabase = await createClient();
-  // RLS scopes this to the signed-in owner's barns only.
-  const { data: barns } = await supabase.from("barns").select("*").order("name");
+  // RLS scopes this to the signed-in owner's barns only. Spec 17.2 (§5A):
+  // explicit columns — `owner_id`, `created_at` and `updated_at` were fetched
+  // and never rendered.
+  const { data: barns } = await supabase
+    .from("barns")
+    .select("id, name, category, notes")
+    .order("name");
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">

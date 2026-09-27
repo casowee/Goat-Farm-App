@@ -3,7 +3,7 @@ import { Settings2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { BreedingTabs } from "@/components/breeding/breeding-tabs";
-import { listHealthRecordsByGoat } from "@/app/(app)/health/actions";
+import { listHealthRecordSummariesByGoats } from "@/lib/health/queries";
 import { DoePerformanceList } from "@/components/breeding/doe-performance-list";
 import {
   computeDoePerformance,
@@ -79,21 +79,28 @@ export default async function DoePerformancePage() {
     notesByDoe.set(n.doe_id, list);
   }
 
-  const rows: DoePerformanceRow[] = await Promise.all(
-    flagged.map(async (p): Promise<DoePerformanceRow> => {
-      // Reuse feature 07's own query — no duplicated health-record logic.
-      const health = await listHealthRecordsByGoat(p.doeId);
-      const goat = goatById.get(p.doeId);
-      return toDoePerformanceRow(
-        p,
-        { tag: goat?.tag ?? p.doeLabel, name: goat?.name ?? null },
-        notesByDoe.get(p.doeId) ?? [],
-        health,
-      );
-    }),
+  // Spec 17.2 (§5C) — this was an N+1: one `select('*')` health-record query
+  // per flagged doe, fired inside the `map` below. A farm with 15 flagged does
+  // meant 15 separate round-trips. Now it's a single `in (…)` query over all
+  // the flagged does at once, grouped by goat in memory. Still feature 07's
+  // health-record read, just batched — no duplicated logic.
+  const healthByDoe = await listHealthRecordSummariesByGoats(
+    flagged.map((p) => p.doeId),
   );
 
+  const rows: DoePerformanceRow[] = flagged.map((p): DoePerformanceRow => {
+    const goat = goatById.get(p.doeId);
+    return toDoePerformanceRow(
+      p,
+      { tag: goat?.tag ?? p.doeLabel, name: goat?.name ?? null },
+      notesByDoe.get(p.doeId) ?? [],
+      healthByDoe.get(p.doeId) ?? [],
+    );
+  });
+
   // How many active does exist at all — for context on an empty flagged list.
+  // Spec 17.2 (§5D): deliberately NOT a database count — `allGoats` is already
+  // in memory for the flag computation above, which needs every goat.
   const activeDoeCount = allGoats.filter(
     (g) => g.sex === "female" && g.status === "active",
   ).length;

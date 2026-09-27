@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SwBridge } from "@/components/pwa/sw-bridge";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,7 +34,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`dark ${geistSans.variable} ${geistMono.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/* Spec 17.1 — registers public/sw.js (production only) and refreshes
+            the page when the service worker revalidates it in the background. */}
+        <SwBridge />
+        {children}
+      </body>
     </html>
   );
 }

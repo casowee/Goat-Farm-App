@@ -120,7 +120,55 @@ goat-link fix), with Total kids counting all three correctly.
 
 ## 11. Implementation note
 
-*(fill during/after build)*
+*(spec still `in progress` — the owner's hands-on test is outstanding. Recorded so far:)*
+
+**Barn — an ambiguity this spec did not cover (owner-resolved 2026-09-21).** Section 5 lists the
+quick-add fields as Dam / Origin / DOB / Sex / Sire / Breed / Notes, but `goats.barn_id` is `NOT NULL`
+and every kid needs one. The owner chose to **lock barn to the first kid's barn**, read-only, the same
+treatment as date of birth — litter mates are physically with their dam at birth. `reproductive_state`
+is likewise submitted as `intact` without asking (a newborn is never castrated), matching the main
+wizard's own default.
+
+### iPhone bug — Save button unreachable in the quick-add loop (fixed 2026-09-27)
+
+**Reported:** on iPhone, adding the second (or later) kid through "Add another kid from this same
+birth", the Save button could not be seen or tapped.
+
+**Actual root cause — two compounding layout faults, both confirmed by measurement** (WebKit, Safari's
+own engine, iPhone-emulated at 390px wide):
+
+1. **The quick-add form had no height management at all.** Unlike the main `UPD-003`/`UPD-010` wizard —
+   whose step content sat in a capped, scrollable region with the nav row outside it — this form was
+   built as one long unconstrained column. Measured at 390×844 it rendered **917px tall inside an 844px
+   viewport**, so the dialog (which is `position: fixed` and vertically centred) hung off both edges:
+   the Save row landed at y=833–865, below the screen, with **nothing scrollable to reach it**.
+2. **`DialogContent` never capped itself to the viewport, and the obvious fix — copying the wizard's
+   `max-h-[58vh]` — was not enough.** `vh`/`dvh` measure the *full* screen, not the space actually
+   left once the iOS keyboard is up. With the cap applied, the dialog still measured 530px against a
+   ~430px visible strip and Save was off-screen again. This is why matching the wizard verbatim would
+   have looked correct on a desk and still failed in the barn with the keyboard open.
+
+**Fix (all three in `components/ui/dialog.tsx`, `goat-form-dialog.tsx`, `litter-mate-quick-add-form.tsx`):**
+
+- `DialogContent` now publishes the **visual** viewport as `--visual-vh` / `--visual-vv-top` (a
+  `window.visualViewport` listener), caps its height to `calc(var(--visual-vh,100dvh)-1.5rem)`, and
+  centres itself within that visible area. With no keyboard this resolves to exactly the previous
+  centred position, so no other dialog changes appearance; with the keyboard up the dialog shrinks and
+  recentres into the strip that is actually visible instead of hanging underneath it.
+- `DialogContent` changed from `grid` to `flex flex-col` (identical for stacked children) so a form
+  inside can claim the leftover height.
+- **Both** the wizard and the quick-add form now use the *same* structure: the form is
+  `flex min-h-0 flex-1 flex-col`, its **fields** scroll in `flex-1 min-h-0 overflow-y-auto`, and the
+  action row is a `shrink-0` sibling below them — so Save/Next is never something you scroll past and
+  can never be pushed off-screen. A `sticky`-footer variant was tried first and rejected: it fought the
+  dialog's own bottom padding, leaving form content visibly peeking beneath the bar.
+- The "Added so far" list is capped (`max-h-20 overflow-y-auto`) so a long litter can't grow that box
+  tall enough to squeeze the form.
+
+**Measured result** (same harness, Save/Next required to be both fully inside the visible area *and*
+hit-testable at its centre): quick-add Save and wizard Next are **inside and tappable at 844px, 500px,
+430px and 380px of visible height**, including after scrolling the fields to the bottom — versus
+off-screen at every keyboard size before the fix. Console clean (no errors or warnings).
 
 ## 12. Verification evidence
 

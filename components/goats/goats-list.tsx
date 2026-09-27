@@ -41,7 +41,29 @@ import type { Database } from "@/types/database.types";
 import type { ParentPickerGoat } from "@/components/goats/parent-picker";
 import type { HealthConditionPreset } from "@/app/(app)/health/actions";
 
-type Goat = Database["public"]["Tables"]["goats"]["Row"];
+// Spec 17.2 (§5A) — the list query selects explicit columns rather than `*`,
+// so this row type names them. It stays a superset of what the inline edit
+// dialog needs, so trimming a column the dialog depends on fails to compile
+// instead of silently emptying a field.
+type Goat = Pick<
+  Database["public"]["Tables"]["goats"]["Row"],
+  | "id"
+  | "tag"
+  | "name"
+  | "date_of_birth"
+  | "sex"
+  | "reproductive_state"
+  | "origin"
+  | "purchase_date"
+  | "is_temp_tag"
+  | "barn_id"
+  | "sire_id"
+  | "sire_name"
+  | "dam_id"
+  | "dam_name"
+  | "status"
+  | "notes"
+>;
 
 export type GoatListRow = Goat & {
   barn: { id: number; name: string } | null;

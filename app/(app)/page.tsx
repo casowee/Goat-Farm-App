@@ -1,426 +1,129 @@
 import { Suspense } from "react";
-import { createClient } from "@/lib/supabase/server";
-import { TopBarSlot } from "@/components/top-bar";
-import { BarnFilter } from "@/components/dashboard/barn-filter";
-import { DashboardCsvButton } from "@/components/dashboard/dashboard-csv-button";
-import { DonutChartSkeleton, LineChartSkeleton } from "@/components/dashboard/chart-skeleton";
-import { CompositionDonutLazy } from "@/components/dashboard/composition-donut-lazy";
-import { WeightTrendChartLazy } from "@/components/dashboard/weight-trend-chart-lazy";
-import {
-  DueSoonList,
-  type BreedingDueRow,
-} from "@/components/dashboard/due-soon-list";
-import { BreedingStatus } from "@/components/dashboard/breeding-status";
-import { StockLevelsWidget } from "@/components/dashboard/stock-levels-widget";
-import { HerdTimelineChart } from "@/components/dashboard/herd-timeline-chart";
-import { NewbornPeriodsChart } from "@/components/dashboard/newborn-periods-chart";
-import { LogHerdEventDialog } from "@/components/dashboard/log-herd-event-dialog";
-import { computeHerdComposition } from "@/lib/dashboard/herd-composition";
-import { computeHerdTimeline } from "@/lib/dashboard/herd-timeline";
-import { computeMonthlyWeightAverages } from "@/lib/dashboard/weight-trend";
-import {
-  DEFAULT_DUE_SOON_WINDOW_DAYS,
-  dueSoon,
-  type DueSoonSourceRecord,
-} from "@/lib/dashboard/due-soon";
-import { computeCurrentSeasonStatus } from "@/lib/breeding/status";
-import { computeBreedingReminders } from "@/lib/breeding/reminders";
-import { eligibleBreedingMales } from "@/lib/breeding/eligible-males";
-import type { SeasonTemplate } from "@/lib/breeding/templates";
-import { ApproveSeasonButton } from "@/components/breeding/approve-season-button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  BreedingStatusSkeleton,
+  DueSoonSkeleton,
+  StockLevelsSkeleton,
+  WeightTrendSkeleton,
+} from "@/components/dashboard/dashboard-skeletons";
+import { SkeletonChart } from "@/components/skeletons/skeleton-card";
+import { DashboardTopBar } from "@/components/dashboard/sections/dashboard-top-bar";
+import {
+  HerdCompositionSection,
+  SexRatioSection,
+} from "@/components/dashboard/sections/herd-donut-sections";
+import { NewbornKidsSection } from "@/components/dashboard/sections/newborn-kids-section";
+import { WeightTrendSection } from "@/components/dashboard/sections/weight-trend-section";
+import { BreedingStatusSection } from "@/components/dashboard/sections/breeding-status-section";
+import { DueSoonSection } from "@/components/dashboard/sections/due-soon-section";
+import { StockLevelsSection } from "@/components/dashboard/sections/stock-levels-section";
+import { HerdGrowthSection } from "@/components/dashboard/sections/herd-growth-section";
 
-// UPD-006 amendment (2026-08-29) — the "Herd growth" section (the cumulative
-// running-total chart AND its "Log herd event" trigger) is deactivated at the
-// owner's request: the straight-increasing line wasn't useful and the section
-// took too much space. This is a deactivation, NOT a deletion — `herd_events`,
-// `lib/dashboard/herd-timeline.ts`, `computeHerdTimeline`, the `createHerdEvent`
-// server action and `LogHerdEventDialog` are all kept intact. Flip this to
-// `true` to bring the whole section back. The timeline is still computed below
-// because the CSV export reports the current herd size.
-const SHOW_HERD_GROWTH_SECTION = false;
-
+/**
+ * Spec 17.3 (§5C) — the dashboard, split into independently streaming sections.
+ *
+ * **This component awaits nothing but its own search params, and that is the
+ * point.** Each card below is an async server component inside its own
+ * `<Suspense>`. Because they are siblings, React renders them all in one pass, so
+ * every query still starts at the same moment it did under the old page-level
+ * `Promise.all` — no waterfall (§5C, §9, V4). What changed is that a card paints
+ * as soon as *its* data is ready instead of waiting for the slowest card on the
+ * page. The barn-scoped goat read, the farm-wide goat read, the barn list and the
+ * breeding panel are all `cache()`d (`lib/dashboard/queries.ts`,
+ * `lib/dashboard/breeding-panel.ts`), so sharing between sections costs nothing.
+ *
+ * Herd totals still exclude sold, deceased and stolen goats — that logic moved
+ * into `loadHerdComposition()` unchanged, and one `cache()`d call now feeds both
+ * donuts and the CSV export (§5C, V10).
+ *
+ * Card order and grid classes are unchanged from before the split, so the page
+ * looks identical once everything has arrived.
+ */
 export default async function DashboardPage({
   searchParams,
 }: {
   searchParams: Promise<{ barn?: string }>;
 }) {
   const { barn } = await searchParams;
-  const supabase = await createClient();
-
-  const barnId = barn ? Number(barn) : undefined;
-  const hasBarnFilter = barnId !== undefined && Number.isInteger(barnId);
-
-  // UPD-011 (11a) — these five queries have no dependency on one another, but
-  // were previously awaited one at a time, turning 5 round-trips to Supabase
-  // into a strictly sequential waterfall. Firing them together cuts wall-clock
-  // time to roughly the cost of the single slowest query instead of the sum of
-  // all of them (measured against this project: ~1.6s sequential vs ~0.35s
-  // parallel for a comparable batch of round-trips). RLS still scopes every
-  // query to the signed-in owner.
-  let goatQuery = supabase
-    .from("goats")
-    .select("id, tag, name, sex, reproductive_state, date_of_birth, status");
-  if (hasBarnFilter) {
-    goatQuery = goatQuery.eq("barn_id", barnId);
-  }
-
-  const [
-    { data: barns },
-    { data: goats },
-    { data: inventory },
-    { data: allGoats },
-    { data: herdEvents },
-    { data: breedingOccurrences },
-    { data: breedingSeasonBucks },
-    { data: breedingTemplateRows },
-  ] = await Promise.all([
-    supabase.from("barns").select("id, name").order("name"),
-    goatQuery,
-    supabase.from("inventory_items").select("*").order("name"),
-    // Herd population timeline — farm-wide (a whole-farm metric; the barn
-    // filter doesn't apply — a goat moving barns isn't an addition or
-    // removal). Every goat, with just the fields the timeline + the
-    // log-event picker need.
-    supabase
-      .from("goats")
-      .select(
-        "id, tag, name, sex, reproductive_state, status, origin, date_of_birth, purchase_date",
-      )
-      .order("tag"),
-    supabase.from("herd_events").select("event_type, event_date"),
-    // Feature 09 — the dashboard's compact breeding status line + the buck
-    // in/out reminders merged into "Due soon". Farm-wide, not barn-filtered.
-    supabase
-      .from("breeding_season_occurrences")
-      .select("id, season_template_id, start_date, end_date"),
-    supabase.from("breeding_season_bucks").select("season_id, buck_id"),
-    supabase
-      .from("breeding_season_templates")
-      .select("id, label, start_month, length_months")
-      .order("start_month"),
-  ]);
-
-  const barnLabel = hasBarnFilter
-    ? ((barns ?? []).find((b) => b.id === barnId)?.name ?? "Selected barn")
-    : "All barns";
-
-  const goatRows = goats ?? [];
-  const goatIds = goatRows.map((goat) => goat.id);
-  const goatById = new Map(goatRows.map((goat) => [goat.id, goat]));
-
-  const composition = computeHerdComposition(goatRows);
-
-  // These two depend on the goat set resolved above (to scope by
-  // `goats.barn_id`), but are independent of each other — fire together
-  // rather than sequentially.
-  const [{ data: weightRows }, { data: healthRows }] = goatIds.length
-    ? await Promise.all([
-        supabase
-          .from("weights")
-          .select("weighed_on, weight_kg")
-          .in("goat_id", goatIds),
-        supabase
-          .from("health_records")
-          .select("goat_id, record_type, title, next_due_date, status")
-          .not("next_due_date", "is", null)
-          .in("goat_id", goatIds),
-      ])
-    : [{ data: [] }, { data: [] }];
-  const weightTrend = computeMonthlyWeightAverages(weightRows ?? []);
-
-  const dueSoonSource: DueSoonSourceRecord[] = (healthRows ?? []).map((row) => {
-    const goat = goatById.get(row.goat_id);
-    return {
-      goatId: row.goat_id,
-      goatTag: goat?.tag ?? "",
-      goatName: goat?.name ?? null,
-      recordType: row.record_type,
-      title: row.title,
-      nextDueDate: row.next_due_date,
-      status: row.status,
-    };
-  });
-  const dueItems = dueSoon(dueSoonSource, {
-    windowDays: DEFAULT_DUE_SOON_WINDOW_DAYS,
-  });
-
-  // Feature 09 — breeding status line + buck in/out reminders (farm-wide).
-  const now = new Date();
-  const breedingTemplates: SeasonTemplate[] = breedingTemplateRows ?? [];
-
-  const allGoatRows = allGoats ?? [];
-  const allGoatById = new Map(allGoatRows.map((g) => [g.id, g]));
-  const { bucks: breedingBucks, bucklings: breedingBucklings } =
-    eligibleBreedingMales(allGoatRows, now);
-
-  const breedingBucksBySeason = new Map<
-    number,
-    { ids: number[]; tags: string[] }
-  >();
-  for (const row of breedingSeasonBucks ?? []) {
-    const entry = breedingBucksBySeason.get(row.season_id) ?? {
-      ids: [],
-      tags: [],
-    };
-    entry.ids.push(row.buck_id);
-    const tag = allGoatById.get(row.buck_id)?.tag;
-    if (tag) entry.tags.push(tag);
-    breedingBucksBySeason.set(row.season_id, entry);
-  }
-  const breedingOccurrenceRows = (breedingOccurrences ?? []).map((o) => {
-    const linked = breedingBucksBySeason.get(o.id) ?? { ids: [], tags: [] };
-    return {
-      id: o.id,
-      buck_ids: linked.ids,
-      buck_tags: linked.tags,
-      season_template_id: o.season_template_id,
-      start_date: o.start_date,
-      end_date: o.end_date,
-    };
-  });
-
-  const breedingSeasonStatus = computeCurrentSeasonStatus(
-    breedingTemplates,
-    breedingOccurrenceRows,
-    now,
-  );
-
-  const MS_PER_DAY = 86_400_000;
-  const todayMidnight = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  ).getTime();
-  const breedingDueItems: BreedingDueRow[] = computeBreedingReminders(
-    breedingTemplates,
-    breedingOccurrenceRows,
-    now,
-  )
-    .map((reminder, index) => {
-      const dueMidnight = new Date(
-        reminder.dueDate.getFullYear(),
-        reminder.dueDate.getMonth(),
-        reminder.dueDate.getDate(),
-      ).getTime();
-      const iso = `${reminder.dueDate.getFullYear()}-${String(
-        reminder.dueDate.getMonth() + 1,
-      ).padStart(2, "0")}-${String(reminder.dueDate.getDate()).padStart(2, "0")}`;
-      return {
-        key: `${reminder.type}-${index}`,
-        type: reminder.type,
-        label: reminder.label,
-        dueDate: iso,
-        daysUntilDue: Math.round((dueMidnight - todayMidnight) / MS_PER_DAY),
-        isEstimate: reminder.isEstimate,
-        action:
-          reminder.type === "introduce_males" && reminder.templateId != null ? (
-            <ApproveSeasonButton
-              templateId={reminder.templateId}
-              suggestedStart={iso}
-              bucks={breedingBucks}
-              bucklings={breedingBucklings}
-              barns={barns ?? []}
-              templates={breedingTemplates}
-            />
-          ) : undefined,
-      };
-    })
-    .filter((item) => item.daysUntilDue <= DEFAULT_DUE_SOON_WINDOW_DAYS);
-
-  const timeline = computeHerdTimeline(allGoats ?? [], herdEvents ?? []);
-  const herdSizeNow =
-    timeline.length > 0 ? timeline[timeline.length - 1].runningTotal : 0;
-  const pickerGoats = (allGoats ?? []).map((goat) => ({
-    id: goat.id,
-    tag: goat.tag,
-    name: goat.name,
-    status: goat.status,
-  }));
-  // UPD-007 — the newborn-periods chart buckets born-here goats by birth month;
-  // it switches its own window client-side, so it just needs the raw rows.
-  const newbornGoats = (allGoats ?? []).map((goat) => ({
-    origin: goat.origin,
-    date_of_birth: goat.date_of_birth,
-  }));
-
-  const stageDonut = [
-    { name: "Does", value: composition.byStage.Doe },
-    { name: "Bucks", value: composition.byStage.Buck },
-    { name: "Doelings", value: composition.byStage.Doeling },
-    { name: "Bucklings", value: composition.byStage.Buckling },
-    { name: "Wethers", value: composition.byStage.Wether },
-    { name: "Kids", value: composition.byStage.Kid },
-  ];
-  const sexDonut = [
-    { name: "Female", value: composition.totalFemale },
-    { name: "Male", value: composition.totalMale },
-  ];
 
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-5 md:p-6">
-      <TopBarSlot>
-        <BarnFilter barns={barns ?? []} value={barn ?? "all"} />
-        <DashboardCsvButton
-          composition={composition}
-          barnLabel={barnLabel}
-          herdSizeNow={herdSizeNow}
-        />
-      </TopBarSlot>
+      <Suspense fallback={null}>
+        <DashboardTopBar barn={barn} />
+      </Suspense>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        {/*
-          UPD-006 amendment (2026-08-29): the entire "Herd growth" section —
-          the cumulative timeline chart and the "Log herd event" trigger — is
-          deactivated at the owner's request. Kept in code (not deleted) so it
-          can be re-enabled by flipping SHOW_HERD_GROWTH_SECTION above.
-        */}
-        {SHOW_HERD_GROWTH_SECTION && (
-          <Card className="rounded-2xl lg:col-span-2 min-w-0">
-            <CardHeader className="px-3">
-              <CardTitle>Herd growth</CardTitle>
-              <CardDescription>
-                Whole-farm herd size over time — births and purchases from goat
-                records, plus logged sales, deaths and other changes. Not
-                affected by the barn filter.
-              </CardDescription>
-              <CardAction>
-                <LogHerdEventDialog goats={pickerGoats} />
-              </CardAction>
-            </CardHeader>
-            <CardContent className="px-3">
-              {timeline.length > 0 ? (
-                <HerdTimelineChart data={timeline} />
-              ) : (
-                <p className="text-sm text-copy-muted">
-                  No herd history yet. Register goats, or log a herd event, to
-                  see the timeline.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {/* Deactivated by UPD-006; the section itself owns the flag and its data. */}
+        <Suspense fallback={null}>
+          <HerdGrowthSection />
+        </Suspense>
 
         {/*
           UPD-011 refinement (2026-09-05, owner testing): Herd composition
           first, Sex ratio second, Newborn Kids third — Weight growth, Due
           soon and Stock levels keep their prior relative order after that.
         */}
-        <Card className="rounded-2xl min-w-0">
-          <CardHeader className="px-3">
-            <CardTitle>Herd composition</CardTitle>
-            <CardDescription>
-              {hasBarnFilter
-                ? `Active goats in ${barnLabel}, by stage.`
-                : "Active goats, by stage."}{" "}
-              Sold, deceased and stolen goats are not counted.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-3">
-            <Suspense fallback={<DonutChartSkeleton />}>
-              <CompositionDonutLazy data={stageDonut} centerLabel="goats" />
-            </Suspense>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl min-w-0">
-          <CardHeader className="px-3">
-            <CardTitle>Sex ratio</CardTitle>
-            <CardDescription>Female to male across this view.</CardDescription>
-          </CardHeader>
-          <CardContent className="px-3">
-            <Suspense fallback={<DonutChartSkeleton />}>
-              <CompositionDonutLazy data={sexDonut} centerLabel="goats" />
-            </Suspense>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl lg:col-span-2 min-w-0">
-          <CardHeader className="px-3">
-            <CardTitle>Newborn Kids</CardTitle>
-            <CardDescription>
-              Kids born on the farm each month. Zero-birth months show as an
-              empty bar, not a gap.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 px-3">
-            <NewbornPeriodsChart goats={newbornGoats} />
-            <p className="text-xs text-copy-muted">
-              Shows when kids have been born — useful for spotting your farm&apos;s
-              natural breeding season until real breeding records exist.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl min-w-0">
-          <CardHeader className="px-3">
-            <CardTitle>Weight growth</CardTitle>
-            <CardDescription>
-              Average recorded weight per month across the herd.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-3">
-            {weightTrend.length > 0 ? (
-              <Suspense fallback={<LineChartSkeleton />}>
-                <WeightTrendChartLazy data={weightTrend} />
-              </Suspense>
-            ) : (
-              <p className="text-sm text-copy-muted">
-                No weigh-ins recorded yet for this view.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl min-w-0">
-          <CardHeader className="px-3">
-            <CardTitle>Breeding season</CardTitle>
-            <CardDescription>
-              Whether a buck is currently with the herd.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-3">
-            <BreedingStatus status={breedingSeasonStatus} now={now} />
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl min-w-0">
-          <CardHeader className="px-3">
-            <CardTitle>Due soon</CardTitle>
-            <CardDescription>
-              Vaccinations, deworming, checkups and breeding reminders due in
-              the next {DEFAULT_DUE_SOON_WINDOW_DAYS} days.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-3">
-            <DueSoonList
-              items={dueItems}
-              windowDays={DEFAULT_DUE_SOON_WINDOW_DAYS}
-              breedingItems={breedingDueItems}
+        <Suspense
+          fallback={
+            <SkeletonChart
+              variant="donut"
+              withDots
+              label="Loading herd composition…"
             />
-          </CardContent>
-        </Card>
+          }
+        >
+          <HerdCompositionSection barn={barn} />
+        </Suspense>
 
-        <Card className="rounded-2xl min-w-0">
-          <CardHeader className="px-3">
-            <CardTitle>Stock levels</CardTitle>
-            <CardDescription>
-              Low or out-of-stock inventory items (farm-wide — not affected by
-              the barn filter).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-3">
-            <StockLevelsWidget items={inventory ?? []} />
-          </CardContent>
-        </Card>
+        <Suspense
+          fallback={
+            <SkeletonChart
+              variant="donut"
+              descriptionLines={1}
+              label="Loading sex ratio…"
+            />
+          }
+        >
+          <SexRatioSection barn={barn} />
+        </Suspense>
 
+        <Suspense
+          fallback={
+            <SkeletonChart
+              variant="bar"
+              className="lg:col-span-2"
+              label="Loading newborn kids…"
+            />
+          }
+        >
+          <NewbornKidsSection />
+        </Suspense>
+
+        <Suspense fallback={<WeightTrendSkeleton label="Loading weight growth…" />}>
+          <WeightTrendSection barn={barn} />
+        </Suspense>
+
+        <Suspense
+          fallback={<BreedingStatusSkeleton label="Loading breeding season…" />}
+        >
+          <BreedingStatusSection />
+        </Suspense>
+
+        <Suspense fallback={<DueSoonSkeleton label="Loading due soon…" />}>
+          <DueSoonSection barn={barn} />
+        </Suspense>
+
+        <Suspense fallback={<StockLevelsSkeleton label="Loading stock levels…" />}>
+          <StockLevelsSection />
+        </Suspense>
+
+        {/* Static — no data, so no boundary. */}
         <Card className="rounded-2xl min-w-0">
           <CardHeader className="px-3">
             <CardTitle>Sales over time</CardTitle>

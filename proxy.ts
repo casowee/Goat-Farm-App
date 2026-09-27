@@ -14,6 +14,11 @@ export const config = {
     // decide how the installed icon should look and launch, not as an
     // authenticated page view. Redirecting them to /login would break the
     // installed icon (Chrome/iOS would fetch HTML where an image is expected).
-    "/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|manifest-icon|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Spec 17.1 (§7) — `sw.js` and `offline` join the list for the same
+    // reason: the browser fetches the service worker and its precached offline
+    // fallback outside any page view, and while signed out (the worker also
+    // updates itself after sign-out). Redirecting either to /login would stop
+    // the worker registering at all and leave the offline fallback unreachable.
+    "/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|manifest-icon|manifest.webmanifest|sw.js|offline|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

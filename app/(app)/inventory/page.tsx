@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { listInventoryItems } from "@/lib/inventory/queries";
 import { InventoryItemDialog } from "@/components/inventory/inventory-item-dialog";
 import { DeleteInventoryItemDialog } from "@/components/inventory/delete-inventory-item-dialog";
 import { StockBadge } from "@/components/inventory/stock-badge";
@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { medicineCategoryLabel } from "@/lib/inventory/items";
-import type { InventoryItem } from "@/app/(app)/inventory/actions";
+import type { InventoryItem } from "@/lib/inventory/queries";
 
 function formatQuantity(item: InventoryItem): string {
   const qty = Number(item.quantity);
@@ -196,14 +196,13 @@ function FeedList({ items }: { items: InventoryItem[] }) {
 }
 
 export default async function InventoryPage() {
-  const supabase = await createClient();
-  // RLS scopes this to the signed-in owner's inventory only.
-  const { data: items } = await supabase
-    .from("inventory_items")
-    .select("*")
-    .order("name");
+  // RLS scopes this to the signed-in owner's inventory only. Spec 17.2 (§5A):
+  // explicit columns via the shared `lib/inventory/queries.ts` reader.
+  const all = await listInventoryItems();
 
-  const all = items ?? [];
+  // Spec 17.2 (§5D) — deliberately NOT moved to a database count. The tab
+  // labels count rows this page has to fetch and render anyway, so a
+  // `head: true` count query would add a round-trip and save nothing.
   const medicine = all.filter((item) => item.type === "medicine");
   const feed = all.filter((item) => item.type === "feed");
 

@@ -11,6 +11,36 @@ function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
 
+/**
+ * Publishes the VISUAL viewport (the part of the screen not covered by the iOS
+ * on-screen keyboard) as `--visual-vh` / `--visual-vv-top`, so a dialog can cap
+ * its height and centre itself against the space actually visible.
+ *
+ * `vh`/`dvh` are not enough: on iOS the keyboard shrinks the visual viewport
+ * but leaves those units unchanged, so a `vh`-capped dialog still hangs below
+ * the keyboard and its own footer becomes unreachable (the UPD-013 bug — a
+ * 530px dialog on a 430px visible strip). The fallbacks keep this correct
+ * before the first measurement and anywhere `visualViewport` is unavailable.
+ */
+function useVisualViewportVars() {
+  React.useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const apply = () => {
+      const root = document.documentElement
+      root.style.setProperty("--visual-vh", `${vv.height}px`)
+      root.style.setProperty("--visual-vv-top", `${vv.offsetTop}px`)
+    }
+    apply()
+    vv.addEventListener("resize", apply)
+    vv.addEventListener("scroll", apply)
+    return () => {
+      vv.removeEventListener("resize", apply)
+      vv.removeEventListener("scroll", apply)
+    }
+  }, [])
+}
+
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
 }
@@ -47,13 +77,22 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
 }) {
+  useVisualViewportVars()
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Height is capped to — and the dialog is centred within — the space
+          // actually visible, so a tall dialog can never hide its own footer
+          // behind the on-screen keyboard; it scrolls inside that cap instead.
+          // With no keyboard this resolves to the same centred position as
+          // before (offset 0, visual height == viewport height).
+          // `flex flex-col` (was `grid`) so a form inside can claim the
+          // remaining height and scroll its own fields, keeping its action row
+          // on screen. Stacked children lay out identically either way.
+          "fixed top-[calc(var(--visual-vv-top,0px)+var(--visual-vh,100dvh)*0.5)] left-1/2 z-50 flex max-h-[calc(var(--visual-vh,100dvh)-1.5rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
