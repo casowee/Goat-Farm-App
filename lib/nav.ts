@@ -1,9 +1,9 @@
 import {
   Baby,
+  BookOpenText,
   HeartPulse,
   LayoutDashboard,
   Package,
-  PawPrint,
   Scale,
   ShoppingCart,
   Stethoscope,
@@ -20,7 +20,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Barns", href: "/barns", icon: Warehouse },
-  { label: "Goat Records", href: "/goats", icon: PawPrint },
+  { label: "Goat Records", href: "/goats", icon: BookOpenText },
   // Spec 10 repurposed the `/medicine` stub into farm-wide Inventory.
   { label: "Inventory", href: "/inventory", icon: Package },
   // UPD-016 — "Health History" retired: that label sat on spec 03's stub and

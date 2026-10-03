@@ -64,6 +64,7 @@ shadcn/ui on top of Tailwind. No custom design system. Components live in `compo
 
 - **App shell:** a left sidebar for navigation, a slim top bar, and a main content area. The sidebar links to the modules — Dashboard, Goats, Barns, Health, Breeding, Inventory, Sales, Calendar, Doctor, Analytics.
 - **Responsive:** desktop-first, but on a phone the sidebar collapses into a drawer opened from a top-bar menu button, and content stacks into a single column.
+- **Phone tab bar (spec 18.2):** below the sidebar's 768px breakpoint a floating frosted-glass pill sits at the bottom of the screen with icon-only tabs for Dashboard, Goat Records, Health and Breeding History, plus one reserved empty slot. Every other section stays in the drawer. Page content gets matching bottom padding (`max-md:tab-bar-clearance`), and anything fixed to the bottom of the screen on a phone must sit above the bar (`--tab-bar-height` + `--tab-bar-offset`). The bar is `z-40`: above page content, below dialogs, sheets and the drawer (`z-50`).
 - **List views:** tables on wide screens that collapse into stacked cards on small screens.
 - **Records:** shown as cards or detail pages; related history (health, weight, breeding, lineage) grouped in tabs or sections on the goat detail page.
 - **Modals and dialogs:** centered overlay, `rounded-3xl`, dark background with backdrop blur.
@@ -104,4 +105,4 @@ cheaper than reworking one after it ships. See `ai-workflow-rules.md` → Form L
 
 ## Icons
 
-Lucide React. Stroke-based icons only — no filled variants. Icon sizes: `h-4 w-4` for inline, `h-5 w-5` for buttons, `h-8 w-8` for feature icons in empty states.
+Lucide React. Stroke-based icons only — no filled variants. Icon sizes: `h-4 w-4` for inline, `h-5 w-5` for buttons, `h-8 w-8` for feature icons in empty states. The phone tab bar (spec 18.2) uses `size-6` (24px), the size iOS tab bars use.

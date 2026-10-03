@@ -115,4 +115,31 @@ None.
 
 ## 8. Implementation Notes
 
-_(Agent fills in: route paths, breakpoint used, bottom-fixed elements adjusted, approved icons, deviations.)_
+Built 2026-10-03. Status stays `in progress` until the user confirms the iPhone and desktop checks in §7.
+
+**Route paths.** Dashboard `/` (exact match), Goat Records `/goats`, Health `/health`, Breeding History `/breeding`. The last three are active for the whole section (`/goats/12`, `/breeding/settings`, …). The tabs are looked up in `lib/nav.ts` by route, so label, path and icon cannot drift from the sidebar.
+
+**Breakpoint.** 768px, the same one `hooks/use-mobile.ts` and the shadcn sidebar use. The bar is hidden on desktop with CSS (`md:hidden`) rather than `useIsMobile()`, because that hook reports "not mobile" until after the page loads and the bar would appear a moment late on a phone.
+
+**Bottom-fixed elements (audit).** None exist. The app has no toasts, no floating buttons and no sticky save bars; save buttons sit inside dialogs, and Show more is in the normal page flow. The only change needed was bottom padding on the app shell's `<main>` (`max-md:tab-bar-clearance`).
+
+**V9 — not applicable.** There is no toast system to position, and none was added (user's decision, 2026-10-03).
+
+**Icons.** `LayoutDashboard`, `HeartPulse` and `Baby` from lucide as proposed. Goat Records uses lucide's `BookOpenText` (an open record book). History: the custom goat-head icon from §4D was drawn, shown to the user and approved on 2026-10-03, then replaced the same day at the user's request with a book-record style icon; `components/icons/goat-icon.tsx` was deleted, so §4D and its row in §5 no longer apply. The same icon replaces `PawPrint` for Goat Records in the sidebar — a one-line swap in `lib/nav.ts`; nothing else in the sidebar changed. Icons are 24px (`size-6`), recorded in `ui-context.md`.
+
+**Layering.** The bar is `z-40`: above page content and the top bar (`z-10`), below dialogs, sheets, dropdowns and the drawer (`z-50`).
+
+**Keyboard.** The bar fades out and becomes `inert` while a text input, textarea, native select or editable element has focus. Checkboxes, radios and buttons do not hide it.
+
+**Hidden on login and offline.** The bar is mounted in `app/(app)/layout.tsx`, which those two pages are outside of, so no route check is needed.
+
+**Deviations and choices.**
+- *Glass color:* the bar uses the elevated surface token (`--bg-elevated`) at 60% rather than `--bg-surface`. Cards are `--bg-surface`, so a bar in the same color would blend into the cards scrolling under it.
+- *Fallback:* written as a solid base with the glass inside `@supports (backdrop-filter or -webkit-backdrop-filter)`, which has the same effect as the spec's `@supports not` wording.
+- *Tapping the active tab:* scrolls to top only when the page on screen is the tab's own page. From deeper in a section (a goat's detail page) the tap goes to that section's list, as a native tab bar does.
+- *Pages outside the bar* (barns, inventory, …): no tab is active and the bubble fades out.
+- *Safe area:* the app does not set `viewport-fit=cover`, so iOS already keeps the page above the home indicator and `env(safe-area-inset-bottom)` resolves to 0; the bar then sits 8px above that edge. The `env()` term is kept so the bar stays correct if `viewport-fit=cover` is ever added.
+
+**Files.** Created `components/nav/bottom-tab-bar.tsx`, `components/nav/tab-config.ts`. Changed `app/(app)/layout.tsx` (mount + padding), `app/globals.css` (glass, bubble, clearance, two geometry variables), `lib/nav.ts` (icon swap), `context/ui-context.md`.
+
+**Automatic verification.** `npx tsc --noEmit` and `npm run build` clean (V1); `npm run lint` at the project baseline; no dependency change. A temporary unauthenticated page rendering the real bar was screenshotted in Chromium at 390px and 1280px and then deleted: the pill, four icons plus the empty slot, the bubble under slot 2, the blur over scrolling rows and the bottom clearance all rendered at phone width, and no bar rendered at desktop width. Safari itself, the keyboard behavior, VoiceOver and the signed-in pages were not checked here — those are the user's §7 checks.
