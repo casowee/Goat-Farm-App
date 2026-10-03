@@ -375,6 +375,13 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 > ships with a clearly-labelled "coming soon" placeholder tile in its place (owner's choice, 2026-08-29).
 > The `◀ next` marker stays on `08` / `09`.
 
+> ✅ **`UPD-018` (Kid Loss Count on the Newborn Kids Card) — `done` 2026-10-03, confirmed by the
+> user.** `context/update-specs/018-kid-loss-tracking.md`. No migration,
+> read-only. Adds a one-line "N lost of M born" badge at the right end of the Newborn Kids title line,
+> for the card's existing window and end date. A kid is lost if it is born-here, born in that range and
+> `deceased`; the bars exclude exactly those kids, so bars + lost = M. The selected range button keeps
+> an accent highlight. (Amended three times on 2026-10-03 — an earlier 30-day rule was removed.)
+
 > ⚡ **`UPD-011` (Dashboard Performance, Compact Newborn Chart & App-Shell) — `in progress`, built
 > 2026-09-05, awaiting the owner's hands-on iPhone test.**
 > `context/update-specs/011-dashboard-performance-and-app-shell.md`. No migration. **11a:** measured a real

@@ -1,6 +1,6 @@
 # Spec 18.1 — Instant Tap Feedback
 
-**Phase:** 6 · **Spec:** 18 — Native feel · **Status:** `in progress`
+**Phase:** 6 · **Spec:** 18 — Native feel · **Status:** `done`
 **Depends on:** Spec 03 (app shell), 17.3 (skeleton screens)
 
 ---
@@ -197,5 +197,6 @@ baseline — the same one pre-existing `hooks/use-mobile.ts` error and five
 pre-existing `_prev` warnings, nothing new. `package.json` / `package-lock.json`
 unchanged.
 
-V2–V10 are touch behaviours on a physical iPhone and are the user's to confirm; the
-spec stays `in progress` until they do.
+V2–V10 are touch behaviours on a physical iPhone and were the user's to confirm.
+The user confirmed the feature works and asked for the spec to be marked `done` on
+2026-10-03.
