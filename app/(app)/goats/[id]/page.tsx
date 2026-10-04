@@ -1,11 +1,10 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, PawPrint } from "lucide-react";
+import { PawPrint } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { GoatBackButton } from "@/components/goats/goat-back-button";
 import { GoatStageBadge } from "@/components/goats/goat-stage-badge";
 import { TempTagBadge } from "@/components/goats/temp-tag-badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ageInMonths } from "@/lib/goats/stage";
@@ -100,15 +99,9 @@ export default async function GoatDetailPage({
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-      <Button
-        variant="ghost"
-        size="sm"
-        nativeButton={false}
-        render={<Link href={backHref} />}
-      >
-        <ArrowLeft />
-        {backLabel}
-      </Button>
+      {/* Spec 13 — returns to the page the owner came from; `backHref` is only
+          the fallback when the card was opened directly. */}
+      <GoatBackButton fallbackHref={backHref} fallbackLabel={backLabel} />
 
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">

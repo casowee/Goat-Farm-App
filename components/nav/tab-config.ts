@@ -14,15 +14,15 @@ function tab(href: string): NavItem {
 
 /**
  * The bar always lays out five equal columns. `null` is a reserved slot: it
- * holds its space but renders nothing, so the four tabs keep their final
- * positions and filling slot 5 later is a one-line change here.
+ * holds its space but renders nothing. Spec 13 filled the fifth slot, reserved
+ * since 18.2, with the Calendar; the first four kept their positions.
  */
 export const tabSlots: (NavItem | null)[] = [
   tab("/"),
   tab("/goats"),
   tab("/health"),
   tab("/breeding"),
-  null,
+  tab("/calendar"),
 ];
 
 /**

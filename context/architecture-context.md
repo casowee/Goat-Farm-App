@@ -11,7 +11,7 @@
 | Data access      | Supabase JS client + generated types| Typed reads / writes from web today, reusable by mobile later           |
 | File storage     | Supabase Storage                    | Goat photos (and generated files if ever persisted)                     |
 | Charts           | Recharts                            | Dashboard graphs and analytics                                          |
-| Calendar         | react-big-calendar                  | Activity / due-date calendar view                                       |
+| Calendar         | Custom month grid (no library)      | Activity / due-date calendar view — replaced the planned `react-big-calendar` in spec 13 (see Calendar and reminders) |
 | PDF export       | @react-pdf/renderer                 | Goat history, herd summary, and sales reports                           |
 | Hosting          | Vercel (free tier)                  | Deployment of the Next.js app                                           |
 
@@ -76,7 +76,7 @@ Every owned table has an `owner` column referencing the Supabase auth user, used
 
 Derived, not stored as tables:
 
-- **Calendar events** are read from the due-date columns (`health_records.next_due_date` for recurring vaccination / deworming / checkup follow-ups, `breedings.expected_kidding`, `tasks.due_date`) and merged into one event list. Spec 12 introduced the first cut of this query as the pure `dueSoon()` function in `lib/dashboard/due-soon.ts`; spec 13 (calendar) reuses it.
+- **Calendar events** are derived on every visit and merged into one event list by the pure `buildCalendarEvents()` in `lib/calendar/events.ts` (spec 13). It reads group health events and their next due dates (`health_record_batches` + `health_records.next_due_date`), single-goat routine due dates, logged breeding seasons and template estimates, the expected kidding window, litters (from kids' `date_of_birth` + `dam_id`) and departures (`herd_events`). Spec 12 introduced the first cut of the due-date part as the pure `dueSoon()` in `lib/dashboard/due-soon.ts`, which the calendar reuses. `tasks.due_date` joins the list with spec 14.
 - **Reminders** use the same due-date queries.
 - **Family tree** is walked through `goats.sire_id` / `goats.dam_id`.
 - **Herd-population timeline** (`UPD-006`) combines derived birth/purchase additions (`goats.date_of_birth`
@@ -105,7 +105,12 @@ Derived, not stored as tables:
 - A castrated male resolves to Wether regardless of age. The age thresholds (kid → young stock → adult) live in one place so they are easy to adjust to the farm's breeds.
 
 ### Calendar and reminders
-- A single function gathers upcoming due dates and tasks across the relevant tables and returns a unified, dated list used by both the calendar view and the reminders.
+- A single function gathers dated events across the relevant tables and returns a unified, dated list used by the calendar view (and, later, the reminders): `buildCalendarEvents(sources, rangeStart, rangeEnd, now)` in `lib/calendar/events.ts` (spec 13).
+- **It only combines existing helpers; it owns no date rules.** Due dates come from `dueSoon()`, batch grouping and the "superseded" rule from `lib/health/group-events.ts`, breeding estimates from `computeBreedingReminders()`, the kidding window from `computeKiddingWindow()`, and litters from `computeKiddingEvents()` / `labelLitterSize()`. A rule changed in one of those shows up on the calendar with no change there. New sources (spec 14's tasks and feeding schedule) are added as one more input and one more block.
+- **Scope:** routine group health events and due dates, breeding, births and departures. Illness, injury, treatment and checkup records are never on the calendar — they stay on each goat's own card (`UPD-016`).
+- **Reads are bounded by the visible range** (`lib/calendar/queries.ts`, all in one `Promise.all`): the shown month's weeks, or the list view's 90-day window. Group health events and breeding seasons are read whole through their existing `cache()`d helpers, because the superseded rule and the kidding window both depend on rows outside the visible range.
+- **The view is a lightweight custom month grid, not `react-big-calendar`** (decided in spec 13). That library's month view is cramped at iPhone width and adds download weight for features the calendar does not use; a 7-column CSS grid with category dots fits the screen with no horizontal scroll and needs no new dependency.
+- **Days cross the server → client boundary as ISO `YYYY-MM-DD` strings, never `Date` objects**, so the server's timezone cannot shift an event onto the neighbouring day on the owner's phone. View state (month, view, selected day, category filters) lives in the URL (`lib/calendar/view-state.ts`).
 
 ### PDF reports
 - Report data is assembled (single goat history, herd summary, or sales over a period), rendered with `@react-pdf/renderer`, and returned as a download. Heavier reports may run in an `app/api` handler.

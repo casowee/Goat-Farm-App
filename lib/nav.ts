@@ -1,6 +1,7 @@
 import {
   Baby,
   BookOpenText,
+  CalendarDays,
   HeartPulse,
   LayoutDashboard,
   Package,
@@ -27,6 +28,9 @@ export const navItems: NavItem[] = [
   // never held real content. The route is now the real farm-wide Health page
   // (now Upcoming + Done tabs of group events), so the label is simply "Health".
   { label: "Health", href: "/health", icon: HeartPulse },
+  // Spec 13 — the farm-wide calendar. Also the fifth tab of the phone tab bar
+  // (`components/nav/tab-config.ts`).
+  { label: "Calendar", href: "/calendar", icon: CalendarDays },
   // Spec 15 — the Doctor module: static, non-diagnostic condition reference plus
   // this farm's own "what worked before" treatment history per condition.
   { label: "Health Reference", href: "/doctor", icon: Stethoscope },

@@ -57,7 +57,7 @@ Small features stay a single row. Sub-feature tables below are filled in for fin
 | 3     | 10  | inventory                   | Both       | `done` ***** — built **ahead of 08/09 at the owner's request** (out of normal roadmap order) and confirmed working by the owner in the running app (2026-08-29) |
 | 3     | 11  | sales-and-purchases         | Both       | `planned`     |
 | 4     | 12  | dashboard-analytics         | Both       | `done` ****** — built **ahead of 09 and 11 at the owner's request** (out of roadmap order) and confirmed working by the owner in the running app (2026-08-29); Sales widget deferred to a "coming soon" placeholder until 11 exists |
-| 4     | 13  | calendar                    | Both       | `planned`     |
+| 4     | 13  | calendar                    | Both       | `in progress` — started 2026-10-04, built **ahead of `14` at the owner's request**. Read-only calendar over existing data (health group events and due dates, breeding seasons and estimates, expected kidding window, litters, sales / deaths / stolen); `14` will add tasks and the feeding schedule into `buildCalendarEvents()`. Awaiting the owner's real-iPhone test |
 | 5     | 14  | todos-reminders             | Both       | `planned`     |
 | 5     | 15  | health-reference (Doctor)   | Both       | `in progress` ◀ — static reference content + `/doctor` browse & condition pages, plus **"mark a treatment as effective"** (one additive `health_records.marked_effective` column, so this unit is no longer front-end-only) |
 | 5     | 16  | reports-pdf                 | Both       | `planned`     |
@@ -496,9 +496,9 @@ Herd size and composition (counts by stage, male vs female, buck-to-doe ratio), 
 the untouched legacy prototype tables). `architecture-context.md`'s Data Model section was updated to
 match reality so spec 13 (calendar) builds its due-date query against accurate docs.
 
-### 13 — calendar · Both · `planned`
-Month/week view merging vaccination & deworming due dates, expected kidding, feeding schedule, and to-dos. **Depends on:** 07, 09, 14.
-*Likely split:* unified due-date/event gathering function in `lib` `(Back-end · logic)` · `react-big-calendar` view + add-task interaction `(Front-end)`.
+### 13 — calendar · Both · `in progress`
+Spec `context/feature-specs/13-calendar.md`. Started 2026-10-04, **built ahead of `14` at the owner's request**. A read-only `/calendar` page (month grid + list view) over data the app already records: group health events done and their next due dates, single-goat routine due dates, logged breeding seasons (males in / out), upcoming season estimates, the expected kidding window, litters, and sales / deaths / stolen. Illness, injury, treatment and checkup records are not shown. **Depends on:** 07, `UPD-016`/`UPD-017`, 09, `UPD-012`/`UPD-013`, `UPD-008`.
+*Built as:* `buildCalendarEvents()` in `lib/calendar/events.ts` — a pure function that only combines the existing helpers `(Back-end · logic)` · a lightweight custom month grid, no `react-big-calendar` `(Front-end)`. **`14` will add tasks and the feeding schedule into `buildCalendarEvents()`**; creating anything from the calendar is `14`'s job. No migration.
 
 ---
 

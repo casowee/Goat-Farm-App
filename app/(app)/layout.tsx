@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BottomTabBar } from "@/components/nav/bottom-tab-bar";
+import { InAppHistoryTracker } from "@/components/nav/in-app-history";
 import { TopBar } from "@/components/top-bar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
@@ -24,6 +25,9 @@ export default async function AppLayout({
 
   return (
     <SidebarProvider className="bg-base">
+      {/* Spec 13 — lets a Back button know whether there is an in-app page
+          to go back to. Renders nothing. */}
+      <InAppHistoryTracker />
       <AppSidebar />
       <div className="flex min-h-svh flex-1 flex-col bg-base">
         <TopBar />
