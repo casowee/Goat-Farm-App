@@ -155,21 +155,6 @@ export async function listDashboardWeights(goatIds: number[]) {
   return data ?? [];
 }
 
-/**
- * Health records with a `next_due_date`, for the "Due soon" card. Same
- * single-consumer reasoning as `listDashboardWeights` for the missing `cache()`.
- */
-export async function listDueHealthRecords(goatIds: number[]) {
-  if (goatIds.length === 0) return [];
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("health_records")
-    .select("goat_id, record_type, title, next_due_date, status")
-    .not("next_due_date", "is", null)
-    .in("goat_id", goatIds);
-  return data ?? [];
-}
-
 /** The barn names used by the filter, the card descriptions and the CSV header. */
 export const listDashboardBarns = cache(async () => {
   const supabase = await createClient();

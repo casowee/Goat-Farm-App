@@ -345,8 +345,8 @@ export type HealthBatch = NonNullable<
  * into `dueSoon()`'s input shape. Single-goat records (`batch_id is null`)
  * are deliberately left out — they are not shown on the Health page.
  *
- * The dashboard's own widget keeps its barn-scoped `listDueHealthRecords()`,
- * which still includes single-goat records. Both feed the *same* `dueSoon()`
+ * The dashboard's Due soon widget reads this same list (UPD-019 — it shows
+ * group events only too, scoped to the barn filter). Both feed the *same* `dueSoon()`
  * computation in `lib/dashboard/due-soon.ts` — the ordering and overdue
  * handling are not reimplemented here. The product, date-given and batch
  * fields ride along untouched for `upcomingGroupEvents()`.

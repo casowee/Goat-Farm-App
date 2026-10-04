@@ -107,6 +107,14 @@ actual table/columns confirmed in Task 1. Render as a simple list on the dashboa
 (`components/dashboard/due-soon-list.tsx`), respecting the barn filter. **This function should be
 reusable by spec 13 (calendar)** — keep it free of any dashboard-specific rendering concerns.
 
+> **Cross-reference — 2026-10-04, `UPD-019`** (`context/update-specs/019-dashboard-due-soon-groups.md`,
+> `in progress`): the Due soon widget's health rows now show **group events only** (records made through
+> Bulk schedule), one row per group with no goat tags, matching the Health page (`UPD-016`). Single-goat
+> next-due records are no longer listed in this widget — they stay on each goat's own card and in the
+> Calendar (spec `13`). The 30-day window and the breeding reminders are unchanged; more than 5 group rows
+> are cut to 5 with a "See all" link to the Health page's Upcoming tab. The description of this task above
+> is the original behaviour.
+
 ## 8. Task 5 — Stock levels
 
 A small tile/list showing inventory items where `isLowStock()` is true (or quantity is 0), reusing the

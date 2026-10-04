@@ -728,6 +728,7 @@ supersede a whole group's event. `UPD-017` (the Bulk schedule dialog that writes
   not blocking.)* As built and accepted, "Does (3 of 58)" supersedes an earlier whole-"Does" event,
   because the exclusion suffix is ignored when matching groups. Two other limits of label matching are
   recorded in Section 11. Revisit as a new update spec if it causes trouble in use.
-- **Dashboard Due soon widget after a bulk action** *(opened 2026-10-04, still open — not blocking)*. It lists every goat of a bulk
+- **Dashboard Due soon widget after a bulk action** *(opened 2026-10-04; **taken up by `UPD-019`**,
+  `019-dashboard-due-soon-groups.md`, the same day — the widget now shows group events only)*. It lists every goat of a bulk
   action as a separate row once the due date is inside its 30-day window (finding in Section 11). The
   amendment deliberately does not change it; the owner decides whether it should be grouped too.

@@ -10,17 +10,19 @@ import {
   type BreedingDueRow,
 } from "@/components/dashboard/due-soon-list";
 import { ApproveSeasonButton } from "@/components/breeding/approve-season-button";
+import { listDashboardGoats, resolveBarnView } from "@/lib/dashboard/queries";
 import {
-  listDashboardGoats,
-  listDueHealthRecords,
-  resolveBarnView,
-} from "@/lib/dashboard/queries";
+  listBatchDueHealthRecords,
+  listHealthBatches,
+} from "@/lib/health/queries";
+import {
+  currentUpcoming,
+  doneGroupEvents,
+  supersededBatchIds,
+  upcomingGroupEvents,
+} from "@/lib/health/group-events";
 import { loadBreedingPanel } from "@/lib/dashboard/breeding-panel";
-import {
-  DEFAULT_DUE_SOON_WINDOW_DAYS,
-  dueSoon,
-  type DueSoonSourceRecord,
-} from "@/lib/dashboard/due-soon";
+import { DEFAULT_DUE_SOON_WINDOW_DAYS, dueSoon } from "@/lib/dashboard/due-soon";
 import { computeBreedingReminders } from "@/lib/breeding/reminders";
 
 const MS_PER_DAY = 86_400_000;
@@ -34,46 +36,53 @@ function toIso(date: Date): string {
 }
 
 /**
- * Spec 17.3 (§5C) — health reminders due in the next
- * {@link DEFAULT_DUE_SOON_WINDOW_DAYS} days, merged with feature 09's buck
- * in/out reminders.
+ * Spec 17.3 (§5C) — what is due in the next
+ * {@link DEFAULT_DUE_SOON_WINDOW_DAYS} days (plus anything overdue): group
+ * health events, merged with feature 09's buck in/out reminders.
  *
- * The heaviest card on the dashboard: it needs the barn-scoped goats, their due
- * health records, and the whole breeding panel. Before this spec that cost was
- * paid by every other card too, because nothing rendered until it finished. Now
- * the donuts are on screen while this one is still assembling.
+ * UPD-019 — the health side shows GROUP events only (records made through Bulk
+ * schedule, `batch_id is not null`), one row per group, exactly as the Health
+ * page's Upcoming tab does. Nothing new is computed here: the same reads, the
+ * same `dueSoon()`, and the same `lib/health/group-events.ts` helpers
+ * (one row per batch, superseded events dropped) are reused — only the window
+ * differs (30 days here, open-ended on the Health page). A single-goat record
+ * no longer appears in this widget; it stays on that goat's own card.
  *
- * The health side is barn-scoped (via the goat ids); the breeding reminders are
- * farm-wide, exactly as before.
+ * The health side is still barn-scoped, as it always was: with the dashboard's
+ * barn filter on, a group event is shown if any of its goats are in that barn
+ * and its count is of those goats. The breeding reminders are farm-wide,
+ * exactly as before.
  */
 export async function DueSoonSection({ barn }: { barn: string | undefined }) {
   const { barnId } = await resolveBarnView(barn);
-  const goats = await listDashboardGoats(barnId);
-  const goatById = new Map(goats.map((goat) => [goat.id, goat]));
 
-  // Independent of each other: the health records need the goat ids resolved
-  // above, the breeding panel needs nothing from here.
-  const [healthRows, { templates, occurrenceRows, bucks, bucklings, barns }] =
-    await Promise.all([
-      listDueHealthRecords(goats.map((g) => g.id)),
-      loadBreedingPanel(),
-    ]);
+  // Independent of each other. The barn's goats are only needed to scope the
+  // due records when a barn filter is on.
+  const [
+    dueRecords,
+    batchRows,
+    barnGoats,
+    { templates, occurrenceRows, bucks, bucklings, barns },
+  ] = await Promise.all([
+    listBatchDueHealthRecords(),
+    listHealthBatches(),
+    barnId !== undefined ? listDashboardGoats(barnId) : null,
+    loadBreedingPanel(),
+  ]);
 
-  const dueSoonSource: DueSoonSourceRecord[] = healthRows.map((row) => {
-    const goat = goatById.get(row.goat_id);
-    return {
-      goatId: row.goat_id,
-      goatTag: goat?.tag ?? "",
-      goatName: goat?.name ?? null,
-      recordType: row.record_type,
-      title: row.title,
-      nextDueDate: row.next_due_date,
-      status: row.status,
-    };
-  });
-  const dueItems = dueSoon(dueSoonSource, {
-    windowDays: DEFAULT_DUE_SOON_WINDOW_DAYS,
-  });
+  const barnGoatIds = barnGoats ? new Set(barnGoats.map((g) => g.id)) : null;
+  const scopedRecords = (dueRecords ?? []).filter(
+    (record) => !barnGoatIds || barnGoatIds.has(record.goatId),
+  );
+
+  // A group event that a newer one has replaced is not owed any more —
+  // judged over every group event, not just the ones inside the window.
+  const groupEvents = currentUpcoming(
+    upcomingGroupEvents(
+      dueSoon(scopedRecords, { windowDays: DEFAULT_DUE_SOON_WINDOW_DAYS }),
+    ),
+    supersededBatchIds(doneGroupEvents(batchRows ?? [])),
+  );
 
   const now = new Date();
   const todayMidnight = new Date(
@@ -121,13 +130,13 @@ export async function DueSoonSection({ barn }: { barn: string | undefined }) {
       <CardHeader className="px-3">
         <CardTitle>Due soon</CardTitle>
         <CardDescription>
-          Vaccinations, deworming, checkups and breeding reminders due in the
-          next {DEFAULT_DUE_SOON_WINDOW_DAYS} days.
+          Group health events and breeding reminders due in the next{" "}
+          {DEFAULT_DUE_SOON_WINDOW_DAYS} days.
         </CardDescription>
       </CardHeader>
       <CardContent className="px-3">
         <DueSoonList
-          items={dueItems}
+          groupEvents={groupEvents}
           windowDays={DEFAULT_DUE_SOON_WINDOW_DAYS}
           breedingItems={breedingDueItems}
         />

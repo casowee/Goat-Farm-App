@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { HEALTH_RECORD_TYPE_LABELS } from "@/lib/health/records";
-import type { DueSoonItem } from "@/lib/dashboard/due-soon";
+import { formatIsoDate, type GroupEvent } from "@/lib/health/group-events";
 
 /**
  * Feature 09 (Task 6) — breeding "introduce / remove the buck" reminders are
@@ -22,12 +22,19 @@ export interface BreedingDueRow {
   action?: React.ReactNode;
 }
 
+/**
+ * UPD-019 — how many group health rows the widget shows before handing over to
+ * the Health page's Upcoming tab with a "See all" link.
+ */
+export const DUE_SOON_HEALTH_ROW_LIMIT = 5;
+
 interface Row {
   key: string;
   dueDate: string;
-  daysUntilDue: number;
   primary: React.ReactNode;
   secondary: string;
+  /** The right-hand side: when it is due, and any mark. */
+  trailing: React.ReactNode;
   action?: React.ReactNode;
 }
 
@@ -42,20 +49,49 @@ function relativeLabel(days: number, isEstimate = false): string {
   return `${prefix}Due in ${days} days`;
 }
 
-function healthRow(item: DueSoonItem, index: number): Row {
+/**
+ * UPD-019 — a health row is a GROUP event, the same row the Health page's
+ * Upcoming tab shows: what it is, which group and how many goats, and when it
+ * is next due. No goat is named.
+ */
+function healthRow(event: GroupEvent): Row {
+  const count = event.goats.length;
+  const overdue = event.dueStatus === "overdue";
+
   return {
-    key: `h-${item.goatId}-${item.recordType}-${item.dueDate}-${index}`,
-    dueDate: item.dueDate,
-    daysUntilDue: item.daysUntilDue,
+    key: `h-${event.batchId}`,
+    dueDate: event.nextDueDate ?? "",
     primary: (
-      <Link
-        href={`/goats/${item.goatId}`}
-        className="tappable-inline text-sm font-medium text-copy-primary hover:text-brand"
-      >
-        {item.goatName ?? item.goatTag}
-      </Link>
+      <p className="text-sm font-medium text-copy-primary">
+        {HEALTH_RECORD_TYPE_LABELS[event.recordType]} · {event.title}
+        {event.product && (
+          <span className="font-normal text-copy-secondary">
+            {" "}
+            · {event.product}
+          </span>
+        )}
+      </p>
     ),
-    secondary: `${HEALTH_RECORD_TYPE_LABELS[item.recordType]} · ${item.title}`,
+    secondary: `${event.label} · ${count} goat${count === 1 ? "" : "s"}`,
+    trailing: (
+      <span className="flex flex-col items-end gap-0.5">
+        {overdue && (
+          <span className="rounded-md border border-error px-1.5 py-0.5 text-xs font-medium text-error">
+            Overdue
+          </span>
+        )}
+        {event.dueStatus === "due_soon" && (
+          <span className="rounded-md border border-warning px-1.5 py-0.5 text-xs font-medium text-warning">
+            Due soon
+          </span>
+        )}
+        <span
+          className={`text-xs ${overdue ? "text-error" : "text-copy-secondary"}`}
+        >
+          {formatIsoDate(event.nextDueDate)}
+        </span>
+      </span>
+    ),
   };
 }
 
@@ -64,35 +100,47 @@ function breedingRow(item: BreedingDueRow): Row {
   return {
     key: `b-${item.key}`,
     dueDate: item.dueDate,
-    daysUntilDue: item.daysUntilDue,
     primary: (
       <span className="text-sm font-medium text-copy-primary">{item.label}</span>
     ),
     secondary: `Breeding · ${kind}${item.isEstimate ? " · estimated" : ""}`,
+    trailing: (
+      <span
+        className={`text-xs ${
+          item.daysUntilDue < 0 ? "text-error" : "text-copy-secondary"
+        }`}
+      >
+        {relativeLabel(item.daysUntilDue, item.isEstimate)}
+      </span>
+    ),
     action: item.action,
   };
 }
 
 /**
- * Upcoming vaccination / deworming / checkup follow-ups plus breeding buck
- * in/out reminders, soonest-first. Server-rendered. Health rows link to the
- * goat's profile.
+ * Upcoming group health events plus breeding buck in/out reminders,
+ * soonest-first (so anything overdue is at the top). Server-rendered.
+ *
+ * UPD-019 — the health rows are group events only, already chosen and ordered
+ * by `lib/health/group-events.ts`; this component renders the first
+ * {@link DUE_SOON_HEALTH_ROW_LIMIT} of them and links to the Health page for
+ * the rest. Breeding reminders are never cut: the Health page does not show
+ * them, so "See all" could not bring a hidden one back.
  */
 export function DueSoonList({
-  items,
+  groupEvents,
   windowDays,
   breedingItems = [],
 }: {
-  items: DueSoonItem[];
+  groupEvents: GroupEvent[];
   windowDays: number;
   breedingItems?: BreedingDueRow[];
 }) {
-  const estimateByKey = new Map(
-    breedingItems.map((b) => [`b-${b.key}`, b.isEstimate]),
-  );
+  const shownEvents = groupEvents.slice(0, DUE_SOON_HEALTH_ROW_LIMIT);
+  const hasMore = groupEvents.length > DUE_SOON_HEALTH_ROW_LIMIT;
 
   const rows: Row[] = [
-    ...items.map(healthRow),
+    ...shownEvents.map(healthRow),
     ...breedingItems.map(breedingRow),
   ].sort(
     (a, b) => a.dueDate.localeCompare(b.dueDate) || a.key.localeCompare(b.key),
@@ -107,31 +155,33 @@ export function DueSoonList({
   }
 
   return (
-    <ul className="flex flex-col">
-      {rows.map((row) => (
-        <li
-          key={row.key}
-          className="flex items-center justify-between gap-3 border-t border-surface-border py-2 first:border-t-0 first:pt-0 last:pb-0"
+    <div className="flex flex-col gap-3">
+      <ul className="flex flex-col">
+        {rows.map((row) => (
+          <li
+            key={row.key}
+            className="flex items-center justify-between gap-3 border-t border-surface-border py-2 first:border-t-0 first:pt-0 last:pb-0"
+          >
+            <div className="min-w-0">
+              {row.primary}
+              <p className="truncate text-xs text-copy-muted">{row.secondary}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {row.trailing}
+              {row.action}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {hasMore && (
+        <Link
+          href="/health?tab=upcoming"
+          className="tappable-inline self-start text-sm text-brand underline underline-offset-2 hover:text-brand/80"
         >
-          <div className="min-w-0">
-            {row.primary}
-            <p className="truncate text-xs text-copy-muted">{row.secondary}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span
-              className={`text-xs ${
-                row.daysUntilDue < 0 ? "text-error" : "text-copy-secondary"
-              }`}
-            >
-              {relativeLabel(
-                row.daysUntilDue,
-                estimateByKey.get(row.key) ?? false,
-              )}
-            </span>
-            {row.action}
-          </div>
-        </li>
-      ))}
-    </ul>
+          See all
+        </Link>
+      )}
+    </div>
   );
 }
