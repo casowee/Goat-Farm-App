@@ -49,7 +49,7 @@ export const FOLLOW_UP_RECORD_TYPES: readonly HealthRecordType[] = [
   "checkup",
   // UPD-016 — dip wash is recurring care, not a treatment course: it gets the
   // date-given + next-due-date pair, never the medication/course fields. Adding
-  // it here is what puts it on the Schedule tab and the dashboard Due soon
+  // it here is what puts it on the Health page (as a bulk action) and the dashboard Due soon
   // widget, because both read `next_due_date`.
   "dip_wash",
 ];

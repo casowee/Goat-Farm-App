@@ -18,7 +18,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { pageRange, HISTORY_PAGE_SIZE } from "@/lib/pagination";
-import type { HealthRecordType } from "@/lib/health/records";
 import type { DueSoonSourceRecord } from "@/lib/dashboard/due-soon";
 
 /**
@@ -288,121 +287,81 @@ export const listConditionHistoryStats = cache(
 // ---------------------------------------------------------------------------
 // UPD-016 — farm-wide health reads for the `/health` page.
 //
-// Feature 07 stores health records per goat and every existing read is scoped
-// by `goat_id`. Nothing aggregated across the herd existed, which is why the
-// sidebar's Health entry sat on a stub. These reads add that view only — they
-// do not change how a record is created, stored or shown on a goat's own
-// Health tab.
+// Feature 07 stores health records per goat and every other read here is scoped
+// by `goat_id`. These are the reads that look across the herd. They do not
+// change how a record is created, stored or shown on a goat's own Health tab.
 //
-// The goat is embedded (`goats!inner`) rather than looked up per row, so the
-// whole page is one query (the same spec 17.2 §5C rule the Doctor history
-// follows), and `!inner` drops any record whose goat has gone — there would be
-// nothing to link to anyway.
+// Amended 2026-10-04: the farm-wide History list (and its paginated / counted
+// reads) was removed. The Health page now shows only GROUP health events —
+// records a bulk action created (`batch_id is not null`). Individual goat
+// health matters live only on that goat's own card, so both reads below are
+// batch-only by construction.
+//
+// The goat is embedded (`goats!inner`) rather than looked up per row, so each
+// tab is one query (spec 17.2 §5C), and `!inner` drops any record whose goat
+// has gone — there would be nothing to link to anyway.
 // ---------------------------------------------------------------------------
 
-/** One row of the History tab: the record, plus the goat it belongs to. */
-const FARM_HEALTH_RECORD_COLUMNS =
-  "id, goat_id, record_type, status, title, date_occurred, next_due_date, medication_name, dosage, treatment_duration_days, treatment_times_per_day, vet_name, cost, notes, marked_effective, goats!inner(id, tag, name)";
+/**
+ * Just enough of a batched due record to build an Upcoming row: the record,
+ * its goat, and the batch's group label.
+ */
+const BATCH_DUE_HEALTH_COLUMNS =
+  "goat_id, record_type, title, medication_name, date_occurred, next_due_date, status, batch_id, goats!inner(id, tag, name), health_record_batches(label)";
 
-/** Just enough of a due record to build a Schedule row (plus its goat). */
-const FARM_DUE_HEALTH_COLUMNS =
-  "goat_id, record_type, title, next_due_date, status, goats!inner(id, tag, name)";
+/** One bulk action with the records it created (and each record's goat). */
+const HEALTH_BATCH_COLUMNS =
+  "id, label, created_at, excluded_goat_ids, health_records(record_type, title, medication_name, date_occurred, next_due_date, goats!inner(id, tag, name))";
 
-/** The History tab's two optional filters, both carried in the URL. */
-export interface FarmHealthFilters {
-  goatId?: number;
-  recordType?: HealthRecordType;
-}
+/** The most bulk actions the Done tab (and its Archive) reads, newest first. */
+export const HEALTH_BATCH_LIST_LIMIT = 200;
 
-function farmHealthRecordQuery(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  filters: FarmHealthFilters,
-) {
-  let query = supabase
-    .from("health_records")
-    .select(FARM_HEALTH_RECORD_COLUMNS)
-    .order("date_occurred", { ascending: false })
-    .order("id", { ascending: false });
-
-  if (filters.goatId != null) query = query.eq("goat_id", filters.goatId);
-  if (filters.recordType) query = query.eq("record_type", filters.recordType);
-
-  return query;
-}
-
-function farmDueHealthQuery(
+function batchDueHealthQuery(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ) {
   return supabase
     .from("health_records")
-    .select(FARM_DUE_HEALTH_COLUMNS)
-    .not("next_due_date", "is", null);
+    .select(BATCH_DUE_HEALTH_COLUMNS)
+    .not("next_due_date", "is", null)
+    .not("batch_id", "is", null);
 }
 
-type FarmHealthRecordQuery = ReturnType<typeof farmHealthRecordQuery>;
-export type FarmHealthRecord = NonNullable<
-  Awaited<FarmHealthRecordQuery>["data"]
+function healthBatchQuery(supabase: Awaited<ReturnType<typeof createClient>>) {
+  return supabase
+    .from("health_record_batches")
+    .select(HEALTH_BATCH_COLUMNS)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(HEALTH_BATCH_LIST_LIMIT);
+}
+
+type HealthBatchQuery = ReturnType<typeof healthBatchQuery>;
+export type HealthBatch = NonNullable<
+  Awaited<HealthBatchQuery>["data"]
 >[number];
 
 /**
- * One page of every health record the owner has, across every goat, newest
- * event first. RLS scopes it to the signed-in owner exactly as the per-goat
- * read does, so a second account can never see another farm's records.
- */
-export async function listFarmHealthRecordsPage(
-  filters: FarmHealthFilters = {},
-  offset = 0,
-  pageSize: number = HISTORY_PAGE_SIZE,
-): Promise<FarmHealthRecord[]> {
-  const supabase = await createClient();
-  const { from, to } = pageRange(offset, pageSize);
-  const { data } = await farmHealthRecordQuery(supabase, filters).range(
-    from,
-    to,
-  );
-  return data ?? [];
-}
-
-/** The `cache()`d first page — the History tab renders it during the request. */
-export const listFarmHealthRecordsFirstPage = cache(
-  async (filters: FarmHealthFilters = {}): Promise<FarmHealthRecord[]> =>
-    listFarmHealthRecordsPage(filters),
-);
-
-/**
- * How many records match the History tab's current filters — a head-only
- * count, so "Show more" disappears at exactly the right moment (§5D/§5E).
- */
-export const countFarmHealthRecords = cache(
-  async (filters: FarmHealthFilters = {}): Promise<number> => {
-    const supabase = await createClient();
-    let query = supabase
-      .from("health_records")
-      .select("id", { count: "exact", head: true });
-
-    if (filters.goatId != null) query = query.eq("goat_id", filters.goatId);
-    if (filters.recordType) query = query.eq("record_type", filters.recordType);
-
-    const { count } = await query;
-    return count ?? 0;
-  },
-);
-
-/**
- * Every record the owner has that carries a `next_due_date`, farm-wide, mapped
- * into `dueSoon()`'s input shape.
+ * Every record a bulk action created that carries a `next_due_date`, mapped
+ * into `dueSoon()`'s input shape. Single-goat records (`batch_id is null`)
+ * are deliberately left out — they are not shown on the Health page.
  *
- * The dashboard's own widget keeps its barn-scoped `listDueHealthRecords()`;
- * this is the un-scoped equivalent for the Schedule tab. Both feed the *same*
- * `dueSoon()` computation in `lib/dashboard/due-soon.ts` — the windowing,
- * ordering and overdue handling are not reimplemented here.
+ * The dashboard's own widget keeps its barn-scoped `listDueHealthRecords()`,
+ * which still includes single-goat records. Both feed the *same* `dueSoon()`
+ * computation in `lib/dashboard/due-soon.ts` — the ordering and overdue
+ * handling are not reimplemented here. The product, date-given and batch
+ * fields ride along untouched for `upcomingGroupEvents()`.
+ *
+ * Returns `null` when the read itself fails — most likely because the
+ * `health_record_batches` migration has not been applied yet — so the page can
+ * say so instead of showing a misleading "nothing here".
  */
-export const listFarmDueHealthRecords = cache(
-  async (): Promise<DueSoonSourceRecord[]> => {
+export const listBatchDueHealthRecords = cache(
+  async (): Promise<DueSoonSourceRecord[] | null> => {
     const supabase = await createClient();
-    const { data } = await farmDueHealthQuery(supabase);
+    const { data, error } = await batchDueHealthQuery(supabase);
+    if (error || !data) return null;
 
-    return (data ?? []).map((row) => ({
+    return data.map((row) => ({
       goatId: row.goat_id,
       goatTag: row.goats.tag,
       goatName: row.goats.name,
@@ -410,6 +369,25 @@ export const listFarmDueHealthRecords = cache(
       title: row.title,
       nextDueDate: row.next_due_date,
       status: row.status,
+      product: row.medication_name,
+      dateOccurred: row.date_occurred,
+      batchId: row.batch_id,
+      batchLabel: row.health_record_batches?.label ?? null,
     }));
+  },
+);
+
+/**
+ * The bulk actions already done, newest first, each with the records it
+ * created — the Done tab. RLS scopes both the batches and the embedded
+ * records to the signed-in owner. Returns `null` when the read itself fails,
+ * for the same reason as {@link listBatchDueHealthRecords}.
+ */
+export const listHealthBatches = cache(
+  async (): Promise<HealthBatch[] | null> => {
+    const supabase = await createClient();
+    const { data, error } = await healthBatchQuery(supabase);
+    if (error || !data) return null;
+    return data;
   },
 );

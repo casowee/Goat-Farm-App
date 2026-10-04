@@ -8,25 +8,29 @@ import { cn } from "@/lib/utils";
 // the project's "navigable view state lives in the URL" convention, same as
 // `/goats?view=duplicates`.
 //
+// Amended 2026-10-04: the farm-wide History tab is gone. The page shows only
+// GROUP health events — what is next (Upcoming) and what was done (Done).
+// Individual goat health matters live on that goat's own card.
+//
 // The active tab arrives as a prop from the page rather than being read here
 // with `useSearchParams`, which keeps this a plain server component (two links
 // and a border) and keeps the route's `loading.tsx` free of a search-param
 // dependency it cannot satisfy.
-//
-// Switching tabs deliberately drops the other tab's params (the History
-// filters, the Schedule lookahead): each tab owns its own view state, and a
-// stale `?window=` sitting in the URL while History is showing would be a lie.
 
-export type HealthTab = "history" | "schedule";
+export type HealthTab = "upcoming" | "done";
 
 const TABS: { tab: HealthTab; label: string }[] = [
-  { tab: "history", label: "History" },
-  { tab: "schedule", label: "Schedule" },
+  { tab: "upcoming", label: "Upcoming" },
+  { tab: "done", label: "Done" },
 ];
 
-/** Narrow a `?tab=` value; anything unrecognised falls back to History. */
+/**
+ * Narrow a `?tab=` value; anything unrecognised — including a stale
+ * `?tab=history` or `?tab=schedule` link from before the amendment — falls
+ * back to Upcoming.
+ */
 export function parseHealthTab(value: string | undefined): HealthTab {
-  return value === "schedule" ? "schedule" : "history";
+  return value === "done" ? "done" : "upcoming";
 }
 
 export function HealthTabs({ active }: { active: HealthTab }) {

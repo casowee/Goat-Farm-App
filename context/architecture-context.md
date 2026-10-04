@@ -52,6 +52,11 @@ Every owned table has an `owner` column referencing the Supabase auth user, used
   `vaccinations` / `dewormings` / `medicine_records` tables — those were never built under the spec workflow.
   *(The similarly-named `vaccinations` / `deworming` / `medicine_records` / `health_history` tables that exist in
   the database are untouched legacy prototype tables keyed on `goat_records.tag_number`, unrelated to `health_records`.)*
+- `health_record_batches` — `UPD-016`/`UPD-017` amendment (migration `20261004000001_health_record_batches.sql`): one row per
+  bulk health action, with a generated `label` describing the group ("Does · Barn A"). `health_records.batch_id`
+  (nullable, `on delete set null`) links each record a bulk action created to its batch; records entered one at a
+  time on a goat's card have none. The Health page (`/health`) shows **only** batched records, as one group event
+  per bulk action; single-goat records appear on the goat's own card and the dashboard's Due soon widget.
 - `health_condition_presets` — `UPD-004`: seeded farm-wide + owner-custom title suggestions per `record_type`.
 - `breedings` — sire, dam, mating date, expected kidding date, actual kidding date, offspring. *(Spec 09 — not built yet.)*
 - `weights` — goat, date (`weighed_on`), weight (`weight_kg`), notes (spec 08, migration `20260829000002_weights.sql`).

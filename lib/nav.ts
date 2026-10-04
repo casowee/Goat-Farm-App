@@ -25,7 +25,7 @@ export const navItems: NavItem[] = [
   { label: "Inventory", href: "/inventory", icon: Package },
   // UPD-016 — "Health History" retired: that label sat on spec 03's stub and
   // never held real content. The route is now the real farm-wide Health page
-  // (History + Schedule tabs), so the label is simply "Health".
+  // (now Upcoming + Done tabs of group events), so the label is simply "Health".
   { label: "Health", href: "/health", icon: HeartPulse },
   // Spec 15 — the Doctor module: static, non-diagnostic condition reference plus
   // this farm's own "what worked before" treatment history per condition.

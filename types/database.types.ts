@@ -696,8 +696,33 @@ export type Database = {
           },
         ]
       }
+      health_record_batches: {
+        Row: {
+          created_at: string
+          excluded_goat_ids: number[]
+          id: number
+          label: string
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string
+          excluded_goat_ids?: number[]
+          id?: number
+          label: string
+          owner_id?: string
+        }
+        Update: {
+          created_at?: string
+          excluded_goat_ids?: number[]
+          id?: number
+          label?: string
+          owner_id?: string
+        }
+        Relationships: []
+      }
       health_records: {
         Row: {
+          batch_id: number | null
           cost: number | null
           created_at: string
           date_occurred: string
@@ -719,6 +744,7 @@ export type Database = {
           vet_name: string | null
         }
         Insert: {
+          batch_id?: number | null
           cost?: number | null
           created_at?: string
           date_occurred?: string
@@ -740,6 +766,7 @@ export type Database = {
           vet_name?: string | null
         }
         Update: {
+          batch_id?: number | null
           cost?: number | null
           created_at?: string
           date_occurred?: string
@@ -761,6 +788,13 @@ export type Database = {
           vet_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "health_records_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "health_record_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "health_records_goat_id_fkey"
             columns: ["goat_id"]

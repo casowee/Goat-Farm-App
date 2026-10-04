@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { CalendarPlus, Check, Search } from "lucide-react";
+import { CalendarPlus, X } from "lucide-react";
 import {
   bulkCreateHealthRecords,
   type BulkHealthRecordResult,
@@ -43,37 +43,39 @@ import {
   type HealthRecordType,
 } from "@/lib/health/records";
 import { filterGoats, type FilterableGoat } from "@/lib/goats/search";
-import { deriveGoatStage, type GoatStage } from "@/lib/goats/stage";
+import type { GoatStage } from "@/lib/goats/stage";
+import { normalizeTag } from "@/lib/goats/tag";
+import {
+  GOAT_STAGES,
+  batchLabel,
+  type BatchGroupFilters,
+} from "@/lib/health/batch-label";
 import type { InventoryItem } from "@/app/(app)/inventory/actions";
 
 // UPD-017 — the Health page's "Bulk schedule" flow.
 //
-// It is a dialog launched from the Health page's header, NOT a third tab:
-// UPD-016 had just established History / Schedule and this is an action, not a
-// third kind of content (spec Section 5).
+// It is a dialog launched from the Health page's header, NOT a tab of its own:
+// it is an action, not a kind of content (spec Section 5).
+//
+// Amended 2026-10-04: the target is a GROUP, chosen with the sex / stage / barn
+// filters, and the dialog shows how many goats match — not who they are. There
+// is no goat list at all. To leave a few goats out, the owner types a tag into
+// the "Exclude goats" field; the only tags ever on screen are the ones the
+// owner typed, shown as removable chips.
 //
 // Nothing about a single-goat record is rebuilt here. The title field is
 // UPD-004's `HealthTitleCombobox`, the product field is UPD-005's
 // `MedicationCombobox` (pointed at the category `lib/health/products.ts` gives
 // the chosen type), the goat filtering is UPD-008/009's own `filterGoats`, and
 // the submitted values go through the same server-side validation a per-goat
-// create uses. What is new is only the target-selection step and the
-// one-statement bulk insert behind it.
+// create uses. What is new is only the target-selection step and the bulk
+// insert (one batch row + one multi-row statement) behind it.
 
 /** The three routine, whole-group treatments this flow covers (spec Section 5). */
 const BULK_RECORD_TYPES: HealthRecordType[] = [
   "deworming",
   "dip_wash",
   "vaccination",
-];
-
-const STAGE_OPTIONS: GoatStage[] = [
-  "Kid",
-  "Doeling",
-  "Buckling",
-  "Doe",
-  "Buck",
-  "Wether",
 ];
 
 const ALL = "all";
@@ -101,10 +103,6 @@ export type BulkGoat = FilterableGoat & {
   barn_id: number | null;
 };
 
-function goatLabel(goat: BulkGoat): string {
-  return goat.name ? `${goat.tag} — ${goat.name}` : goat.tag;
-}
-
 interface BulkHealthDialogProps {
   /** The owner's herd, already RLS-scoped by the server component above. */
   goats: BulkGoat[];
@@ -124,15 +122,16 @@ export function BulkHealthDialog({
   // Step 1 — record type.
   const [recordType, setRecordType] = useState<string>("");
 
-  // Step 2 — target goats. The filters mirror the goats list's own controls;
-  // `selected` is the fine-tuned answer and is deliberately independent of
-  // them, so narrowing the filters to check something never drops a goat that
-  // was already ticked.
-  const [search, setSearch] = useState("");
+  // Step 2 — target group. The three group filters ARE the selection: every
+  // active goat they match is targeted. `excluded` holds the few the owner
+  // dropped by typing their tag, and only matters for goats the filters
+  // currently match.
   const [sex, setSex] = useState<string>(ALL);
   const [stage, setStage] = useState<string>(ALL);
   const [barn, setBarn] = useState<string>(ALL);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [excluded, setExcluded] = useState<Set<number>>(new Set());
+  const [excludeInput, setExcludeInput] = useState("");
+  const [excludeMessage, setExcludeMessage] = useState("");
 
   // Step 3 — the shared details, the same fields a single-goat entry has.
   const [title, setTitle] = useState("");
@@ -159,11 +158,12 @@ export function BulkHealthDialog({
 
   function reset() {
     setRecordType("");
-    setSearch("");
     setSex(ALL);
     setStage(ALL);
     setBarn(ALL);
-    setSelected(new Set());
+    setExcluded(new Set());
+    setExcludeInput("");
+    setExcludeMessage("");
     setTitle("");
     setTitleIsCustom(false);
     setMedicationName("");
@@ -182,59 +182,85 @@ export function BulkHealthDialog({
 
   // UPD-008/009's own filter, not a second copy of it. Status is pinned to
   // `active`: a sold, deceased or stolen goat is not something to schedule a
-  // treatment for, so it is never offered here (their records stay visible in
-  // the History tab, which does show every status).
-  const filtered = useMemo(
+  // treatment for, so it is never part of a group.
+  const matched = useMemo(
     () =>
       filterGoats(goats, {
-        search,
         sex: sex === ALL ? undefined : (sex as "male" | "female"),
         stage: stage === ALL ? undefined : (stage as GoatStage),
         barnId: barn === ALL ? undefined : Number(barn),
         status: "active",
       }),
-    [goats, search, sex, stage, barn],
+    [goats, sex, stage, barn],
   );
 
-  const allFilteredSelected =
-    filtered.length > 0 && filtered.every((goat) => selected.has(goat.id));
+  // Who actually gets a record: the group, minus anyone excluded by hand.
+  const targets = useMemo(
+    () => matched.filter((goat) => !excluded.has(goat.id)),
+    [matched, excluded],
+  );
+  // The chips: excluded goats that are in the current group. A goat excluded
+  // under one set of filters and no longer matched simply stops counting.
+  const excludedGoats = useMemo(
+    () => matched.filter((goat) => excluded.has(goat.id)),
+    [matched, excluded],
+  );
 
-  function toggleGoat(id: number) {
-    setSelected((prev) => {
+  // The same generator the server uses for the stored batch label, so the
+  // group named here is the group that gets saved.
+  const groupFilters: BatchGroupFilters = {
+    sex: sex === ALL ? undefined : (sex as "male" | "female"),
+    stage: stage === ALL ? undefined : (stage as GoatStage),
+    barnName:
+      barn === ALL
+        ? undefined
+        : barns.find((b) => String(b.id) === barn)?.name,
+  };
+  const groupLabel = batchLabel(groupFilters, targets.length, matched.length);
+
+  /**
+   * Exclude the goat whose tag was typed. Matched against the CURRENT GROUP
+   * only, with UPD-008's `normalizeTag` — the same "is this the same tag?"
+   * rule duplicate detection uses — so "21", "021" and "Mj2" / "MJ02" find the
+   * same goat. A tag that is not in the group is reported, never added.
+   */
+  function addExclusion() {
+    const typed = excludeInput.trim();
+    const key = normalizeTag(typed);
+    if (!key) return;
+
+    const hits = matched.filter((goat) => normalizeTag(goat.tag) === key);
+    if (hits.length === 0) {
+      setExcludeMessage(`No goat with tag ${typed} in this group`);
+      return;
+    }
+    if (hits.every((goat) => excluded.has(goat.id))) {
+      setExcludeMessage(`Tag ${typed} is already excluded`);
+      return;
+    }
+
+    setExcluded((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      for (const goat of hits) next.add(goat.id);
+      return next;
+    });
+    setExcludeInput("");
+    setExcludeMessage("");
+  }
+
+  function removeExclusion(id: number) {
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
       return next;
     });
   }
-
-  function toggleAllFiltered() {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      for (const goat of filtered) {
-        if (allFilteredSelected) next.delete(goat.id);
-        else next.add(goat.id);
-      }
-      return next;
-    });
-  }
-
-  const selectedGoats = useMemo(
-    () => goats.filter((goat) => selected.has(goat.id)),
-    [goats, selected],
-  );
-
-  // Selected goats the current filters are hiding — called out so the count in
-  // the confirmation can never be a surprise.
-  const hiddenSelectedCount =
-    selectedGoats.length -
-    filtered.filter((goat) => selected.has(goat.id)).length;
 
   const detailsValid = title.trim() !== "" && isValidDate(dateOccurred);
 
   const steps: WizardStepDef[] = [
     { id: "type", label: "Type", complete: recordType !== "" },
-    { id: "goats", label: "Goats", complete: selected.size > 0 },
+    { id: "goats", label: "Group", complete: targets.length > 0 },
     { id: "details", label: "Details", complete: detailsValid },
     { id: "confirm", label: "Confirm", complete: true },
   ];
@@ -307,7 +333,26 @@ export function BulkHealthDialog({
           <input
             type="hidden"
             name="goat_ids"
-            value={[...selected].join(",")}
+            value={targets.map((goat) => goat.id).join(",")}
+          />
+          {/* The group itself, so the server can generate the batch label. */}
+          <input type="hidden" name="group_sex" value={sex === ALL ? "" : sex} />
+          <input
+            type="hidden"
+            name="group_stage"
+            value={stage === ALL ? "" : stage}
+          />
+          <input
+            type="hidden"
+            name="group_barn_id"
+            value={barn === ALL ? "" : barn}
+          />
+          <input type="hidden" name="group_total" value={matched.length} />
+          {/* Which goats were left out, so the Health page can name them. */}
+          <input
+            type="hidden"
+            name="excluded_goat_ids"
+            value={excludedGoats.map((goat) => goat.id).join(",")}
           />
           <input type="hidden" name="title" value={title} />
           <input
@@ -372,21 +417,20 @@ export function BulkHealthDialog({
               </div>
             </div>
 
-            {/* Step 2 — target goats */}
+            {/* Step 2 — target group */}
             <div className={stepClass(1)}>
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <div className="relative w-full sm:w-52">
-                  <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-copy-muted" />
-                  <Input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search tag or name"
-                    className="pl-8"
-                    aria-label="Search goats by tag or name"
-                  />
-                </div>
+              <p className="text-sm text-copy-muted">
+                Choose the group. Leave everything on “All” for the whole herd.
+              </p>
 
-                <Select value={sex} onValueChange={(v) => setSex(v ?? ALL)}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Select
+                  value={sex}
+                  onValueChange={(v) => {
+                    setSex(v ?? ALL);
+                    setExcludeMessage("");
+                  }}
+                >
                   <SelectTrigger
                     className="w-full sm:w-32"
                     aria-label="Filter by sex"
@@ -400,7 +444,13 @@ export function BulkHealthDialog({
                   </SelectContent>
                 </Select>
 
-                <Select value={stage} onValueChange={(v) => setStage(v ?? ALL)}>
+                <Select
+                  value={stage}
+                  onValueChange={(v) => {
+                    setStage(v ?? ALL);
+                    setExcludeMessage("");
+                  }}
+                >
                   <SelectTrigger
                     className="w-full sm:w-36"
                     aria-label="Filter by stage"
@@ -409,7 +459,7 @@ export function BulkHealthDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL}>All stages</SelectItem>
-                    {STAGE_OPTIONS.map((s) => (
+                    {GOAT_STAGES.map((s) => (
                       <SelectItem key={s} value={s}>
                         {s}
                       </SelectItem>
@@ -417,7 +467,13 @@ export function BulkHealthDialog({
                   </SelectContent>
                 </Select>
 
-                <Select value={barn} onValueChange={(v) => setBarn(v ?? ALL)}>
+                <Select
+                  value={barn}
+                  onValueChange={(v) => {
+                    setBarn(v ?? ALL);
+                    setExcludeMessage("");
+                  }}
+                >
                   <SelectTrigger
                     className="w-full sm:w-40"
                     aria-label="Filter by barn"
@@ -435,84 +491,92 @@ export function BulkHealthDialog({
                 </Select>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={toggleAllFiltered}
-                  disabled={filtered.length === 0}
-                  className="inline-flex items-center gap-2 text-sm text-copy-secondary hover:text-copy-primary disabled:opacity-50"
-                >
-                  <span
-                    className={`flex h-4 w-4 items-center justify-center rounded border ${
-                      allFilteredSelected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-surface-border"
-                    }`}
-                  >
-                    {allFilteredSelected && <Check className="h-3 w-3" />}
-                  </span>
-                  Select all {filtered.length} shown
-                </button>
-                <span className="text-sm text-copy-primary">
-                  {selected.size} goat{selected.size === 1 ? "" : "s"} selected
-                </span>
-              </div>
-
-              {hiddenSelectedCount > 0 && (
-                <p className="text-xs text-copy-muted">
-                  {hiddenSelectedCount} selected goat
-                  {hiddenSelectedCount === 1 ? " is" : "s are"} hidden by the
-                  current filters — they are still included.
+              <div
+                className="flex flex-col gap-1 rounded-xl border border-surface-border bg-subtle p-3"
+                aria-live="polite"
+              >
+                <p className="text-sm font-medium text-copy-primary">
+                  {groupLabel}
                 </p>
-              )}
-
-              <div className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-xl border border-surface-border p-1">
-                {filtered.length === 0 ? (
-                  <p className="p-3 text-sm text-copy-muted">
-                    No active goats match these filters.
-                  </p>
-                ) : (
-                  filtered.map((goat) => {
-                    const isSelected = selected.has(goat.id);
-                    return (
-                      <button
-                        key={goat.id}
-                        type="button"
-                        onClick={() => toggleGoat(goat.id)}
-                        aria-pressed={isSelected}
-                        className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-subtle"
-                      >
-                        <span className="flex items-center gap-2">
-                          <span
-                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                              isSelected
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-surface-border"
-                            }`}
-                          >
-                            {isSelected && <Check className="h-3 w-3" />}
-                          </span>
-                          {goatLabel(goat)}
-                        </span>
-                        <span className="text-xs text-copy-muted">
-                          {deriveGoatStage({
-                            sex: goat.sex,
-                            reproductiveState: goat.reproductive_state,
-                            dateOfBirth: goat.date_of_birth,
-                          })}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
+                <p className="text-sm text-copy-secondary">
+                  {matched.length === 0
+                    ? "No active goats match."
+                    : excludedGoats.length > 0
+                      ? `${targets.length} of ${matched.length} goats`
+                      : matched.length === 1
+                        ? "1 goat matches"
+                        : `${matched.length} goats match`}
+                </p>
               </div>
+
+              {matched.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="bulk_exclude_tag"
+                    className="text-sm text-copy-secondary"
+                  >
+                    Exclude goats (optional)
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="bulk_exclude_tag"
+                      value={excludeInput}
+                      onChange={(e) => {
+                        setExcludeInput(e.target.value);
+                        setExcludeMessage("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addExclusion();
+                        }
+                      }}
+                      placeholder="Type a tag"
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      className="min-w-0 flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addExclusion}
+                      disabled={excludeInput.trim() === ""}
+                    >
+                      Exclude
+                    </Button>
+                  </div>
+
+                  <p className="text-xs text-copy-muted" aria-live="polite">
+                    {excludeMessage ||
+                      "Type a goat’s tag to leave it out of this action."}
+                  </p>
+
+                  {excludedGoats.length > 0 && (
+                    <ul className="flex flex-wrap gap-1.5">
+                      {excludedGoats.map((goat) => (
+                        <li key={goat.id}>
+                          <button
+                            type="button"
+                            onClick={() => removeExclusion(goat.id)}
+                            aria-label={`Stop excluding ${goat.tag}`}
+                            className="tappable-inline inline-flex items-center gap-1 rounded-xl border border-surface-border bg-subtle py-1 pr-1.5 pl-2.5 text-sm text-copy-primary hover:text-copy-secondary"
+                          >
+                            {goat.tag}
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Step 3 — shared details */}
             <div className={stepClass(2)}>
               <p className="text-sm text-copy-muted">
-                These details apply to every one of the {selected.size} selected
-                goat{selected.size === 1 ? "" : "s"}.
+                These details apply to every one of the {targets.length} goat
+                {targets.length === 1 ? "" : "s"} in this group.
               </p>
 
               <div className="flex flex-col gap-2">
@@ -621,8 +685,9 @@ export function BulkHealthDialog({
                   <span className="font-medium">{formatDate(dateOccurred)}</span>{" "}
                   for{" "}
                   <span className="font-medium">
-                    {selected.size} goat{selected.size === 1 ? "" : "s"}
-                  </span>
+                    {targets.length} goat{targets.length === 1 ? "" : "s"}
+                  </span>{" "}
+                  ({groupLabel})
                   {nextDueDate
                     ? `, due again ${formatDate(nextDueDate)}?`
                     : ", with no follow-up date?"}
@@ -630,15 +695,6 @@ export function BulkHealthDialog({
                 <p className="text-xs text-copy-muted">
                   This creates one health record per goat — the same record you
                   would add on each goat’s own Health tab.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-1.5 rounded-xl border border-surface-border p-3">
-                <p className="text-xs font-medium tracking-wide text-copy-muted uppercase">
-                  Goats ({selectedGoats.length})
-                </p>
-                <p className="text-sm text-copy-secondary">
-                  {selectedGoats.map(goatLabel).join(", ") || "—"}
                 </p>
               </div>
 
@@ -650,8 +706,8 @@ export function BulkHealthDialog({
                 <div className="flex flex-col gap-1.5 rounded-xl border border-surface-border bg-subtle p-3">
                   <p className="text-sm text-copy-primary">
                     Created {result.created} record
-                    {result.created === 1 ? "" : "s"}:{" "}
-                    {result.createdGoats?.join(", ")}.
+                    {result.created === 1 ? "" : "s"}
+                    {result.groupLabel ? ` for ${result.groupLabel}` : ""}.
                   </p>
                   {result.missingGoats && result.missingGoats.length > 0 && (
                     <p className="text-sm text-warning">
@@ -665,8 +721,8 @@ export function BulkHealthDialog({
                     </p>
                   )}
                   <p className="text-xs text-copy-muted">
-                    Check them in the History tab, or on each goat’s own Health
-                    tab.
+                    It now shows as one line on the Upcoming and Done tabs,
+                    and on each goat’s own Health tab.
                   </p>
                 </div>
               ) : null}
@@ -688,11 +744,11 @@ export function BulkHealthDialog({
                   </Button>
                 ) : (
                   <SubmitButton
-                    disabled={selected.size === 0 || !detailsValid}
+                    disabled={targets.length === 0 || !detailsValid}
                     pendingLabel="Creating…"
                   >
-                    Create {selected.size} record
-                    {selected.size === 1 ? "" : "s"}
+                    Create {targets.length} record
+                    {targets.length === 1 ? "" : "s"}
                   </SubmitButton>
                 )}
               </WizardNav>

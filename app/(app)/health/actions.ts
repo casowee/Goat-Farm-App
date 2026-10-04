@@ -4,10 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { conditionSlug } from "@/lib/doctor/conditions";
 import {
-  listFarmHealthRecordsPage,
   listHealthRecordsPageByGoat,
-  type FarmHealthFilters,
-  type FarmHealthRecord,
   type HealthRecord,
 } from "@/lib/health/queries";
 import type { Database } from "@/types/database.types";
@@ -23,6 +20,12 @@ import {
   hasProductField,
   newMedicineCategoryFor,
 } from "@/lib/health/products";
+import {
+  batchLabel,
+  isGoatSex,
+  isGoatStage,
+  type BatchGroupFilters,
+} from "@/lib/health/batch-label";
 
 type HealthRecordInsert =
   Database["public"]["Tables"]["health_records"]["Insert"];
@@ -391,18 +394,6 @@ export async function loadMoreHealthRecords(
 }
 
 /**
- * UPD-016 — the same "Show more" contract for the farm-wide History tab on
- * `/health`. The filters travel with the request so page 2 matches page 1; RLS
- * scopes it to the signed-in owner, exactly like the server-rendered first page.
- */
-export async function loadMoreFarmHealthRecords(
-  filters: FarmHealthFilters,
-  offset: number,
-): Promise<FarmHealthRecord[]> {
-  return listFarmHealthRecordsPage(filters, offset);
-}
-
-/**
  * Feature 15, Task 4 — flag (or unflag) a health record as a treatment that
  * actually worked.
  *
@@ -446,14 +437,15 @@ export async function setHealthRecordEffective(
 /**
  * UPD-017 — the outcome of one bulk create, shown back in the dialog. Either
  * the whole operation failed (`error`, nothing was written) or it succeeded
- * and `created` / `createdGoats` describe what now exists. `missingGoats`
- * names anything that was asked for but is not the owner's to write to, so a
- * partial selection is reported rather than silently dropped.
+ * and `created` / `groupLabel` describe what now exists — a count and the
+ * group, not a list of tags (2026-10-04 amendment). `missingGoats` names
+ * anything that was asked for but is not the owner's to write to, so a partial
+ * selection is reported rather than silently dropped.
  */
 export interface BulkHealthRecordResult {
   error?: string;
   created?: number;
-  createdGoats?: string[];
+  groupLabel?: string;
   missingGoats?: string[];
 }
 
@@ -480,6 +472,15 @@ function goatLabel(goat: { tag: string; name: string | null }): string {
  *    goat gets its record or none does and nothing is half-applied. The
  *    `select()` on the way back confirms how many rows really landed, so a
  *    short write is reported rather than assumed.
+ *
+ * 2026-10-04 amendment — the batch. One `health_record_batches` row is created
+ * first and its id stamped on every record, so the Health page can show the
+ * whole action as one line. Its label is generated here from the group filters
+ * the dialog submitted (never typed by hand). The batch row is a second
+ * statement, so it is compensated rather than transactional: if the records
+ * insert fails, the batch row is deleted again. The records themselves are
+ * still all-or-nothing, and a batch that somehow outlived its failed records
+ * has no records and is never listed (the Done tab skips empty ones).
  */
 export async function bulkCreateHealthRecords(
   formData: FormData,
@@ -517,6 +518,53 @@ export async function bulkCreateHealthRecords(
 
   const ownedGoats = owned ?? [];
   const ownedIds = new Set(ownedGoats.map((goat) => goat.id));
+
+  // The group this action targets, as the dialog's filters described it. Each
+  // value is validated before it can reach the label; the barn's name is read
+  // back under RLS rather than trusted from the browser.
+  const groupFilters: BatchGroupFilters = {};
+  const sexRaw = str(formData.get("group_sex"));
+  if (isGoatSex(sexRaw)) groupFilters.sex = sexRaw;
+  const stageRaw = str(formData.get("group_stage"));
+  if (isGoatStage(stageRaw)) groupFilters.stage = stageRaw;
+  const barnIdNum = Number(str(formData.get("group_barn_id")));
+  if (Number.isInteger(barnIdNum) && barnIdNum > 0) {
+    const { data: barn } = await supabase
+      .from("barns")
+      .select("name")
+      .eq("id", barnIdNum)
+      .maybeSingle();
+    if (barn) groupFilters.barnName = barn.name;
+  }
+  // How many goats the filters matched before any were excluded — what turns
+  // "Does" into "Does (56 of 58)". Never allowed to read as fewer than the
+  // number actually being written.
+  const matchedRaw = Number(str(formData.get("group_total")));
+  const matchedCount = Math.max(
+    Number.isInteger(matchedRaw) ? matchedRaw : 0,
+    ownedGoats.length,
+  );
+  const label = batchLabel(groupFilters, ownedGoats.length, matchedCount);
+
+  // The goats the owner excluded by tag, remembered on the batch so the Health
+  // page can name them. Re-read under RLS like the targets, and never allowed
+  // to include a goat that is actually getting a record.
+  const excludedRequested = [
+    ...new Set(
+      str(formData.get("excluded_goat_ids"))
+        .split(",")
+        .map((raw) => Number(raw.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0 && !ownedIds.has(n)),
+    ),
+  ];
+  let excludedGoatIds: number[] = [];
+  if (excludedRequested.length > 0) {
+    const { data: excludedOwned } = await supabase
+      .from("goats")
+      .select("id")
+      .in("id", excludedRequested);
+    excludedGoatIds = (excludedOwned ?? []).map((goat) => goat.id);
+  }
   const missingGoats = ids
     .filter((id) => !ownedIds.has(id))
     .map((id) => `#${id}`);
@@ -529,16 +577,34 @@ export async function bulkCreateHealthRecords(
     };
   }
 
+  const { data: batch, error: batchError } = await supabase
+    .from("health_record_batches")
+    .insert({ label, excluded_goat_ids: excludedGoatIds })
+    .select("id")
+    .single();
+
+  if (batchError || !batch) {
+    return {
+      error: `Could not start this group action. Nothing was created for any of the ${ownedGoats.length} selected goats — please try again.`,
+    };
+  }
+
   // owner_id is stamped by the column default (auth.uid()) on every row, just
   // as it is for a single-goat create.
   const { data: inserted, error } = await supabase
     .from("health_records")
     .insert(
-      ownedGoats.map((goat) => ({ ...parsed.fields, goat_id: goat.id })),
+      ownedGoats.map((goat) => ({
+        ...parsed.fields,
+        goat_id: goat.id,
+        batch_id: batch.id,
+      })),
     )
     .select("goat_id");
 
   if (error || !inserted) {
+    // Compensate: no records landed, so the batch describing them goes too.
+    await supabase.from("health_record_batches").delete().eq("id", batch.id);
     return {
       error: `Could not save these records. Nothing was created for any of the ${ownedGoats.length} selected goats — please try again.`,
     };
@@ -582,7 +648,7 @@ export async function bulkCreateHealthRecords(
 
   return {
     created: inserted.length,
-    createdGoats: ownedGoats.map(goatLabel),
+    groupLabel: label,
     ...(missingGoats.length > 0 ? { missingGoats } : {}),
   };
 }
