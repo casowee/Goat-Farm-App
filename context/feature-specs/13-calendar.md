@@ -4,7 +4,7 @@
 | ----------- | ------------------------------------------------------------------------------ |
 | Phase       | 4 — Insight (built ahead of `14` to-dos, at the owner's request)               |
 | Aspect      | Mostly front-end; read-only aggregation of existing data, no schema change      |
-| Status      | `in progress` (started 2026-10-04; awaiting the owner's real-iPhone test)      |
+| Status      | `done` (built and confirmed by the owner 2026-10-04)                           |
 | Depends on  | `07` health records, `UPD-016`/`UPD-017` (group events, batch grouping), `09` breeding (seasons, templates, kidding window, reminders), `UPD-012`/`UPD-013` (kidding events), `UPD-008` (`herd_events` departures) |
 | Unblocks    | `14` to-dos (adds tasks and feeding schedule into this calendar later)         |
 
@@ -303,3 +303,11 @@ click-through:
 13. Open a goat from the Calendar, Health, Breeding and Doe Performance pages in turn; "Back" returns to
     each, and to the same month / day / filters on the Calendar. Open a goat's address directly: "Back"
     goes to the goats list.
+
+### Completion (2026-10-04)
+
+`done`. After the build (with the three amendments) was pushed in commit `6d18947`, the user asked for
+spec 13 to be marked done. That instruction is recorded as the user's acceptance of Section 7 and of
+steps 11–13 above; the click-through was not performed from the build environment, which has no sign-in
+and no device. `architecture-context.md` reflects the custom-grid decision (Stack table and Calendar and
+reminders). Spec `14` adds tasks and the feeding schedule into `buildCalendarEvents()`.

@@ -4,7 +4,7 @@
 | ----------------- | ------------------------------------------------------------------ |
 | ID                | `UPD-019`                                                          |
 | Title             | Dashboard "Due soon" widget shows upcoming group health events only — one row per group, no goat tags |
-| Status            | `in progress` — approved by the owner and built 2026-10-04; awaiting the owner's hands-on test |
+| Status            | `done` — approved by the owner and built 2026-10-04; confirmed by the owner 2026-10-04 |
 | Owner approved?   | yes (2026-10-04)                                                   |
 | Feature spec(s)   | `12-dashboard-analytics`; touches the widget `09-breeding` extended |
 | Depends on        | `UPD-016` (group events, `lib/health/group-events.ts`), `UPD-017` (Bulk schedule writes the batches), `UPD-006` (dashboard redesign) |
@@ -159,7 +159,7 @@ Built 2026-10-04.
   so it lists the hidden rows and also later ones.
 - **Checkups** are single-goat records, so they no longer appear in the widget; the card description no
   longer mentions them.
-- **Calendar (spec `13`) is still `in progress`** in a separate piece of work and was not touched. Until
+- **Calendar (spec `13`) was still `in progress`** in a separate piece of work and was not touched (it is `done` as of 2026-10-04, so single-goat due dates are now on the Calendar too). Until
   it ships, a single-goat due date is visible on that goat's own card only. Flagged to the owner.
 
 ## 12. Verification evidence
@@ -172,6 +172,8 @@ helpers were unit-checked under `UPD-016`.
 **Not verified here:** nothing was tested in a browser or on an iPhone — the app is auth-gated and this
 environment has no sign-in and no device. The owner's four iPhone checks in Section 9 are all open.
 
+**Owner confirmation (2026-10-04):** after the build was pushed, the owner asked for `UPD-019` to be marked done. That instruction is recorded as the owner's acceptance of the Section 9 checks; they were not performed from this environment.
+
 ## 13. Resolution / final state
 
-*(fill when done)*
+`done` 2026-10-04. The dashboard's Due soon widget shows upcoming **group** health events only — one row per group, no goat tags, the same rows as the Health page's Upcoming tab — plus the unchanged breeding reminders. Single-goat due dates are on each goat's own card and on the Calendar (spec `13`). No migration. Shipped in commit `8d1b64f`.
